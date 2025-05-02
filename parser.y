@@ -57,8 +57,8 @@ json:
     ;
 
 object:
-    LBRACE RBRACE         { $$ = create_object_node(NULL, 0); }
-    | LBRACE pairs RBRACE { 
+    '{' '}'         { $$ = create_object_node(NULL, 0); }
+    | '{' pairs '}' { 
         int count = 0;
         while ($2[count] != NULL) count++;
         $$ = create_object_node($2, count);
@@ -75,7 +75,7 @@ pairs:
         $$[0] = $1;
         $$[1] = NULL;
     }
-    | pairs COMMA pair { 
+    | pairs ',' pair { 
         int count = 0;
         while ($1[count] != NULL) count++;
         $$ = realloc($1, (count + 2) * sizeof(KeyValuePair*));
@@ -89,15 +89,15 @@ pairs:
     ;
 
 pair:
-    STRING COLON value { 
+    STRING ':' value { 
         $$ = create_key_value_pair($1, $3);
         free($1); /* Free the string as it's copied in create_key_value_pair */
     }
     ;
 
 array:
-    LBRACKET RBRACKET         { $$ = create_array_node(NULL, 0); }
-    | LBRACKET values RBRACKET { 
+    '[' ']'         { $$ = create_array_node(NULL, 0); }
+    | '[' values ']' { 
         int count = 0;
         while ($2[count] != NULL) count++;
         $$ = create_array_node($2, count);
@@ -114,7 +114,7 @@ values:
         $$[0] = $1;
         $$[1] = NULL;
     }
-    | values COMMA value { 
+    | values ',' value { 
         int count = 0;
         while ($1[count] != NULL) count++;
         $$ = realloc($1, (count + 2) * sizeof(ASTNode*));

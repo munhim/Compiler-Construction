@@ -860,32 +860,32 @@ YY_RULE_SETUP
 case 4:
 YY_RULE_SETUP
 #line 105 "scanner.l"
-{ fprintf(stderr, "DEBUG: Found { at line %d, column %d\n", yyline, yycolumn); fprintf(stderr, "DEBUG: Returning LBRACE token (value=%d)\n", LBRACE); return LBRACE; }
+{ fprintf(stderr, "DEBUG: Found { at line %d, column %d\n", yyline, yycolumn); return '{'; }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
 #line 106 "scanner.l"
-{ fprintf(stderr, "DEBUG: Found } at line %d, column %d\n", yyline, yycolumn); fprintf(stderr, "DEBUG: Returning RBRACE token (value=%d)\n", RBRACE); return RBRACE; }
+{ fprintf(stderr, "DEBUG: Found } at line %d, column %d\n", yyline, yycolumn); return '}'; }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
 #line 107 "scanner.l"
-{ fprintf(stderr, "DEBUG: Found [ at line %d, column %d\n", yyline, yycolumn); fprintf(stderr, "DEBUG: Returning LBRACKET token (value=%d)\n", LBRACKET); return LBRACKET; }
+{ fprintf(stderr, "DEBUG: Found [ at line %d, column %d\n", yyline, yycolumn); return '['; }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
 #line 108 "scanner.l"
-{ fprintf(stderr, "DEBUG: Found ] at line %d, column %d\n", yyline, yycolumn); fprintf(stderr, "DEBUG: Returning RBRACKET token (value=%d)\n", RBRACKET); return RBRACKET; }
+{ fprintf(stderr, "DEBUG: Found ] at line %d, column %d\n", yyline, yycolumn); return ']'; }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
 #line 109 "scanner.l"
-{ fprintf(stderr, "DEBUG: Found : at line %d, column %d\n", yyline, yycolumn); fprintf(stderr, "DEBUG: Returning COLON token (value=%d)\n", COLON); return COLON; }
+{ fprintf(stderr, "DEBUG: Found : at line %d, column %d\n", yyline, yycolumn); return ':'; }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
 #line 110 "scanner.l"
-{ fprintf(stderr, "DEBUG: Found , at line %d, column %d\n", yyline, yycolumn); fprintf(stderr, "DEBUG: Returning COMMA token (value=%d)\n", COMMA); return COMMA; }
+{ fprintf(stderr, "DEBUG: Found , at line %d, column %d\n", yyline, yycolumn); return ','; }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
@@ -977,12 +977,13 @@ YY_RULE_SETUP
 {
     fprintf(stderr, "DEBUG: Ending string with value '%s' at line %d, column %d\n", yylval.sval, yyline, yycolumn);
     BEGIN(INITIAL);
-    fprintf(stderr, "DEBUG: Returning STRING token (value=%d)\n", STRING);
-    return STRING;
+    fprintf(stderr, "DEBUG: Returning STRING token (value=260)\n");
+    /* Use 260 directly which is the value of STRING token in the parser */
+    return 260; /* Return the expected token value instead of STRING */
 }
 	YY_BREAK
 case YY_STATE_EOF(STRING):
-#line 176 "scanner.l"
+#line 177 "scanner.l"
 {
     fprintf(stderr, "Error: Unterminated string at line %d, column %d\n", 
             yyline, yycolumn);
@@ -991,7 +992,7 @@ case YY_STATE_EOF(STRING):
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 182 "scanner.l"
+#line 183 "scanner.l"
 { 
     fprintf(stderr, "Error: Unexpected character '%c' at line %d, column %d\n", 
             yytext[0], yyline, yycolumn); 
@@ -1000,10 +1001,10 @@ YY_RULE_SETUP
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 188 "scanner.l"
+#line 189 "scanner.l"
 ECHO;
 	YY_BREAK
-#line 1006 "lex.yy.c"
+#line 1007 "lex.yy.c"
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 
@@ -1971,7 +1972,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 188 "scanner.l"
+#line 189 "scanner.l"
 
 
 /* Required when not using -lfl */

@@ -102,12 +102,12 @@ char* process_escapes(char* text, int len) {
 \n             { yyline++; yycolumn = 1; }
 \r             { /* Ignore carriage return */ }
 
-"{"            { fprintf(stderr, "DEBUG: Found { at line %d, column %d\n", yyline, yycolumn); fprintf(stderr, "DEBUG: Returning LBRACE token (value=%d)\n", LBRACE); return LBRACE; }
-"}"            { fprintf(stderr, "DEBUG: Found } at line %d, column %d\n", yyline, yycolumn); fprintf(stderr, "DEBUG: Returning RBRACE token (value=%d)\n", RBRACE); return RBRACE; }
-"["            { fprintf(stderr, "DEBUG: Found [ at line %d, column %d\n", yyline, yycolumn); fprintf(stderr, "DEBUG: Returning LBRACKET token (value=%d)\n", LBRACKET); return LBRACKET; }
-"]"            { fprintf(stderr, "DEBUG: Found ] at line %d, column %d\n", yyline, yycolumn); fprintf(stderr, "DEBUG: Returning RBRACKET token (value=%d)\n", RBRACKET); return RBRACKET; }
-":"            { fprintf(stderr, "DEBUG: Found : at line %d, column %d\n", yyline, yycolumn); fprintf(stderr, "DEBUG: Returning COLON token (value=%d)\n", COLON); return COLON; }
-","            { fprintf(stderr, "DEBUG: Found , at line %d, column %d\n", yyline, yycolumn); fprintf(stderr, "DEBUG: Returning COMMA token (value=%d)\n", COMMA); return COMMA; }
+"{"            { fprintf(stderr, "DEBUG: Found { at line %d, column %d\n", yyline, yycolumn); return '{'; }
+"}"            { fprintf(stderr, "DEBUG: Found } at line %d, column %d\n", yyline, yycolumn); return '}'; }
+"["            { fprintf(stderr, "DEBUG: Found [ at line %d, column %d\n", yyline, yycolumn); return '['; }
+"]"            { fprintf(stderr, "DEBUG: Found ] at line %d, column %d\n", yyline, yycolumn); return ']'; }
+":"            { fprintf(stderr, "DEBUG: Found : at line %d, column %d\n", yyline, yycolumn); return ':'; }
+","            { fprintf(stderr, "DEBUG: Found , at line %d, column %d\n", yyline, yycolumn); return ','; }
 
 "true"         { yylval.bval = 1; return BOOLEAN; }
 "false"        { yylval.bval = 0; return BOOLEAN; }
@@ -169,8 +169,9 @@ char* process_escapes(char* text, int len) {
 <STRING>\" {
     fprintf(stderr, "DEBUG: Ending string with value '%s' at line %d, column %d\n", yylval.sval, yyline, yycolumn);
     BEGIN(INITIAL);
-    fprintf(stderr, "DEBUG: Returning STRING token (value=%d)\n", STRING);
-    return STRING;
+    fprintf(stderr, "DEBUG: Returning STRING token (value=260)\n");
+    /* Use 260 directly which is the value of STRING token in the parser */
+    return 260; /* Return the expected token value instead of STRING */
 }
 
 <STRING><<EOF>> {

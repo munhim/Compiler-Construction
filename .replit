@@ -26,7 +26,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "make && ./json2relcsv < tests/simple.json --print-ast"
+args = "make && ./json2relcsv < tests/complex.json && ls -la *.csv && echo \"CSV files generated successfully!\""
 
 [[workflows.workflow]]
 name = "build_and_test"
@@ -34,7 +34,12 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd /home/runner && make && ./json2relcsv < tests/simple.json && cat *.csv"
+args = """
+make && echo \"TESTING SIMPLE JSON:\" && ./json2relcsv < tests/simple.json && echo -e \"
+Output for simple.json:\" && cat *.csv && echo -e \"
+
+TESTING COMPLEX JSON:\" && ./json2relcsv < tests/complex.json && echo -e \"
+Output files for complex.json:\" && ls -la *.csv"""
 
 [deployment]
-run = ["sh", "-c", "make && ./json2relcsv < tests/simple.json --print-ast"]
+run = ["sh", "-c", "make && ./json2relcsv < tests/complex.json && ls -la *.csv && echo \"CSV files generated successfully!\""]

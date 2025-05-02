@@ -1,0 +1,5 @@
+id,alices_id,seq,product,issue,quantity
+52,58,0,"book","978-123456",1
+56,58,1,"magazine","Jan 2023",2
+58,60,0,"A001","2023-01-15"
+60,123,"Alice"
