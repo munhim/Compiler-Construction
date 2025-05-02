@@ -20,13 +20,24 @@ args = "JSON2RelCSV Compiler and Runner"
 task = "workflow.run"
 args = "build_and_test"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Test Simple JSON Files"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Document Example Test"
+
 [[workflows.workflow]]
 name = "JSON2RelCSV Compiler and Runner"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "make && ./json2relcsv < tests/complex.json && ls -la *.csv && echo \"CSV files generated successfully!\""
+args = """
+make && mkdir -p output && rm -f output/*.csv && ./json2relcsv < tests/nested.json --out-dir output && echo -e \"
+Generated CSV files:\" && ls -la output/*.csv && echo -e \"
+Output contents:\" && cat output/*.csv"""
 
 [[workflows.workflow]]
 name = "build_and_test"
@@ -35,11 +46,31 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = """
-make && echo \"TESTING SIMPLE JSON:\" && ./json2relcsv < tests/simple.json && echo -e \"
-Output for simple.json:\" && cat *.csv && echo -e \"
+make && mkdir -p output && rm -f output/*.csv && ./json2relcsv < tests/simple.json --out-dir output && echo -e \"
+Generated CSV files:\" && ls -la output/*.csv && echo -e \"
+Output contents:\" && cat output/*.csv"""
 
-TESTING COMPLEX JSON:\" && ./json2relcsv < tests/complex.json && echo -e \"
-Output files for complex.json:\" && ls -la *.csv"""
+[[workflows.workflow]]
+name = "Test Simple JSON Files"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = """
+make && mkdir -p output && rm -f output/*.csv && ./json2relcsv < tests/array_objects.json --out-dir output && echo -e \"
+Generated CSV files:\" && ls -la output/*.csv && echo -e \"
+Output contents:\" && cat output/*.csv"""
+
+[[workflows.workflow]]
+name = "Document Example Test"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = """
+make && mkdir -p output && rm -f output/*.csv && ./json2relcsv < tests/document_example.json --out-dir output && echo -e \"
+Generated CSV files:\" && ls -la output/*.csv && echo -e \"
+Output contents:\" && cat output/*.csv"""
 
 [deployment]
-run = ["sh", "-c", "make && ./json2relcsv < tests/complex.json && ls -la *.csv && echo \"CSV files generated successfully!\""]
+run = ["sh", "-c", 'make && mkdir -p output && rm -f output/*.csv && ./json2relcsv < tests/nested.json --print-ast --out-dir output && echo -e "\nGenerated CSV files:" && ls -la output/*.csv']

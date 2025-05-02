@@ -28,13 +28,15 @@ make
 
 ```bash
 # Process JSON from stdin
-./json2relcsv < input.json
-
-# Process JSON from file
-cat input.json | ./json2relcsv
+./json2relcsv < input.json [--print-ast] [--out-dir DIR]
 ```
 
-Output CSV files will be created in the current directory, with each table in its own file.
+Options:
+- `--help`, `-h` - Show usage information and exit
+- `--print-ast` - Print the AST to stdout before generating CSV files
+- `--out-dir DIR` - Write CSV files to the specified directory (default: current directory)
+
+Output CSV files will be created in the specified directory (or current directory by default), with each table in its own file.
 
 ## Examples
 

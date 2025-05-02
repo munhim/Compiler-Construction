@@ -282,61 +282,169 @@ int is_scalar(ASTNode* node) {
     return node->type != NODE_OBJECT && node->type != NODE_ARRAY;
 }
 
-/* Print a node with proper indentation */
-void print_ast_node(ASTNode* node, int indent) {
+/* ANSI color codes for colorful output */
+#define COLOR_RESET   "\033[0m"
+#define COLOR_RED     "\033[31m"
+#define COLOR_GREEN   "\033[32m"
+#define COLOR_YELLOW  "\033[33m"
+#define COLOR_BLUE    "\033[34m"
+#define COLOR_MAGENTA "\033[35m"
+#define COLOR_CYAN    "\033[36m"
+#define COLOR_WHITE   "\033[37m"
+#define COLOR_BOLD    "\033[1m"
+
+/* Print a node with proper indentation and tree-like structure */
+void print_ast_node(ASTNode* node, int indent, char* prefix) {
     if (!node) return;
     
-    char indent_str[128] = {0};
-    for (int i = 0; i < indent * 2; i++) indent_str[i] = ' ';
+    /* Create indentation string */
+    char indent_str[256] = {0};
+    char tree_prefix[256] = {0};
+    
+    if (prefix) {
+        strcpy(tree_prefix, prefix);
+    }
+    
+    /* Create the tree-like structure prefix */
+    for (int i = 0; i < indent; i++) {
+        if (i == indent - 1) {
+            strcat(tree_prefix, "└── ");
+        } else {
+            strcat(tree_prefix, "    ");
+        }
+    }
+    
+    /* Plain indentation for child items */
+    for (int i = 0; i < indent * 4; i++) {
+        indent_str[i] = ' ';
+    }
     
     switch(node->type) {
         case NODE_OBJECT:
-            printf("%sOBJECT (%ld) {\n", indent_str, node->node_id);
+            printf("%s%s%sObject%s (id=%ld) {\n", 
+                  tree_prefix, COLOR_BOLD, COLOR_BLUE, COLOR_RESET, node->node_id);
+            
             for (int i = 0; i < node->value.object.pair_count; i++) {
                 KeyValuePair* pair = node->value.object.pairs[i];
-                printf("%s  \"%s\": ", indent_str, pair->key);
-                print_ast_node(pair->value, 0); // Key name provides indentation context
-                printf("\n");
+                
+                /* Prepare the child prefix */
+                char child_prefix[256] = {0};
+                strcpy(child_prefix, indent_str);
+                
+                /* Add connector based on whether it's the last item */
+                if (i == node->value.object.pair_count - 1) {
+                    strcat(child_prefix, "└── ");
+                } else {
+                    strcat(child_prefix, "├── ");
+                }
+                
+                /* Print key with color */
+                printf("%s%s\"%s\"%s: ", 
+                      child_prefix, COLOR_GREEN, pair->key, COLOR_RESET);
+                
+                /* For scalar values, print inline */
+                if (is_scalar(pair->value)) {
+                    print_ast_node(pair->value, 0, NULL);
+                    printf("\n");
+                } else {
+                    /* For objects and arrays, print as tree */
+                    printf("\n");
+                    
+                    /* Prepare nested prefix */
+                    char nested_prefix[256] = {0};
+                    strcpy(nested_prefix, indent_str);
+                    
+                    if (i == node->value.object.pair_count - 1) {
+                        strcat(nested_prefix, "    ");
+                    } else {
+                        strcat(nested_prefix, "│   ");
+                    }
+                    
+                    print_ast_node(pair->value, 1, nested_prefix);
+                }
             }
-            printf("%s}", indent_str);
+            
+            /* Print closing brace with tree-like structure */
+            if (indent > 0) {
+                printf("%s%s}%s\n", indent_str, COLOR_BLUE, COLOR_RESET);
+            } else if (prefix) {
+                printf("%s%s}%s\n", prefix, COLOR_BLUE, COLOR_RESET);
+            } else {
+                printf("%s}%s\n", COLOR_BLUE, COLOR_RESET);
+            }
             break;
             
         case NODE_ARRAY:
-            printf("%sARRAY (%ld) [\n", indent_str, node->node_id);
+            printf("%s%s%sArray%s (id=%ld) [\n", 
+                  tree_prefix, COLOR_BOLD, COLOR_MAGENTA, COLOR_RESET, node->node_id);
+            
             for (int i = 0; i < node->value.array.element_count; i++) {
-                printf("%s  ", indent_str);
-                print_ast_node(node->value.array.elements[i], indent + 1);
-                printf("\n");
+                /* Prepare the child prefix */
+                char child_prefix[256] = {0};
+                strcpy(child_prefix, indent_str);
+                
+                /* Mark array elements with index numbers */
+                if (i == node->value.array.element_count - 1) {
+                    printf("%s└── %s[%d]:%s ", indent_str, COLOR_YELLOW, i, COLOR_RESET);
+                    strcat(child_prefix, "    ");
+                } else {
+                    printf("%s├── %s[%d]:%s ", indent_str, COLOR_YELLOW, i, COLOR_RESET);
+                    strcat(child_prefix, "│   ");
+                }
+                
+                /* For scalar values, print inline */
+                if (is_scalar(node->value.array.elements[i])) {
+                    print_ast_node(node->value.array.elements[i], 0, NULL);
+                    printf("\n");
+                } else {
+                    /* For objects and arrays, print as tree */
+                    printf("\n");
+                    print_ast_node(node->value.array.elements[i], 1, child_prefix);
+                }
             }
-            printf("%s]", indent_str);
+            
+            /* Print closing bracket with tree-like structure */
+            if (indent > 0) {
+                printf("%s%s]%s\n", indent_str, COLOR_MAGENTA, COLOR_RESET);
+            } else if (prefix) {
+                printf("%s%s]%s\n", prefix, COLOR_MAGENTA, COLOR_RESET);
+            } else {
+                printf("%s]%s\n", COLOR_MAGENTA, COLOR_RESET);
+            }
             break;
             
         case NODE_STRING:
-            printf("%s\"%s\"", indent_str, node->value.string_val);
+            printf("%s%s\"%s\"%s", 
+                  tree_prefix, COLOR_GREEN, node->value.string_val, COLOR_RESET);
             break;
             
         case NODE_INTEGER:
-            printf("%s%ld", indent_str, node->value.int_val);
+            printf("%s%s%ld%s", 
+                  tree_prefix, COLOR_CYAN, node->value.int_val, COLOR_RESET);
             break;
             
         case NODE_NUMBER:
-            printf("%s%f", indent_str, node->value.num_val);
+            printf("%s%s%f%s", 
+                  tree_prefix, COLOR_CYAN, node->value.num_val, COLOR_RESET);
             break;
             
         case NODE_BOOLEAN:
-            printf("%s%s", indent_str, node->value.bool_val ? "true" : "false");
+            printf("%s%s%s%s", 
+                  tree_prefix, COLOR_YELLOW, 
+                  node->value.bool_val ? "true" : "false", COLOR_RESET);
             break;
             
         case NODE_NULL:
-            printf("%snull", indent_str);
+            printf("%s%snull%s", 
+                  tree_prefix, COLOR_RED, COLOR_RESET);
             break;
     }
 }
 
-/* Print the AST with indentation */
+/* Print the AST with indentation and tree structure */
 void print_ast(ASTNode* node, int indent) {
-    print_ast_node(node, indent);
-    printf("\n");
+    printf("\n%s%s===== AST Tree View =====%s\n\n", COLOR_BOLD, COLOR_WHITE, COLOR_RESET);
+    print_ast_node(node, indent, NULL);
 }
 
 /* Free memory for an AST node and all its children */

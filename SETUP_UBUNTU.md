@@ -34,11 +34,17 @@ You can run the program in several ways:
 ### Process a JSON File
 
 ```bash
-# Using redirection
+# Basic usage with redirection
 ./json2relcsv < input.json
 
 # Using a pipe
 cat input.json | ./json2relcsv
+
+# Print AST and write output to a specific directory
+./json2relcsv < input.json --print-ast --out-dir output
+
+# Show help message
+./json2relcsv --help
 ```
 
 ### Process JSON from Standard Input
@@ -70,7 +76,9 @@ project/
 
 ## Output Files
 
-After running the program, CSV files will be created in the current directory. Each table from the JSON structure will have its own CSV file.
+After running the program, CSV files will be created in the specified output directory (or the current directory if no output directory is specified). Each table from the JSON structure will have its own CSV file, named according to the table it represents.
+
+For example, a JSON structure with a nested "authors" object will generate a separate `authors.csv` file containing all author data, with proper foreign key relationships to the main table.
 
 ## Cleaning Up
 

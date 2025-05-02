@@ -1,4 +1,0 @@
-id,bookstores_id,seq,id,name,position
-6,44,0,1,"John","Manager"
-10,44,1,2,"Jane","Sales"
-44,"BookStore","Downtown",35,43

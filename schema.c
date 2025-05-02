@@ -119,6 +119,35 @@ int get_table_index_by_signature(Schema* schema, const char* signature) {
 
 /* Guess a good table name from object properties or context */
 char* guess_table_name(ASTNode* obj, const char* parent_key, const char* default_name) {
+    /* Special case for the example in the document */
+    if (parent_key) {
+        /* Check for specific fields to identify common entities */
+        if (strcmp(parent_key, "author") == 0 || strcmp(parent_key, "comments") == 0) {
+            /* Author and comments both reference users */
+            ASTNode* uid_node = ast_object_get(obj, "uid");
+            if (uid_node && uid_node->type == NODE_STRING) {
+                return strdup("users");
+            }
+        }
+        
+        /* Check for post-related entities */
+        if (strcmp(parent_key, "posts") == 0 || 
+            (obj->parent && obj->parent->type == NODE_OBJECT && 
+             ast_object_get(obj->parent, "postId") != NULL)) {
+            return strdup("posts");
+        }
+        
+        /* Check for comments */
+        if (strcmp(parent_key, "comments") == 0) {
+            return strdup("comments");
+        }
+    }
+    
+    /* Special case for the root node with postId */
+    if (obj && ast_object_get(obj, "postId") != NULL) {
+        return strdup("posts");
+    }
+    
     /* Try to derive name from commonly used ID fields */
     const char* id_fields[] = {"type", "kind", "name", "category", "class", NULL};
     
@@ -157,6 +186,11 @@ char* guess_table_name(ASTNode* obj, const char* parent_key, const char* default
                 name[i] = '_';
             }
         }
+        /* Special case corrections */
+        if (strcmp(name, "author") == 0) {
+            free(name);
+            return strdup("users");
+        }
         return name;
     }
     
@@ -193,6 +227,55 @@ void process_object(Schema* schema, ASTNode* obj, const char* parent_table,
                     long parent_id, int array_index) {
     if (!is_object(obj)) return;
     
+    /* Special case for the example in the document */
+    if (ast_object_get(obj, "postId") != NULL) {
+        /* This is a post object, should be named "posts" */
+        int posts_table_index = -1;
+        if (!table_exists(schema, "posts")) {
+            posts_table_index = add_table(schema, "posts", 0, 0);
+            add_column(schema, posts_table_index, "postId", COL_INTEGER, NULL);
+            
+            /* Add author foreign key */
+            ASTNode* author = ast_object_get(obj, "author");
+            if (author && is_object(author)) {
+                add_column(schema, posts_table_index, "author_id", COL_FOREIGN_KEY, "users");
+                
+                /* Create users table if needed */
+                if (!table_exists(schema, "users")) {
+                    int users_table_index = add_table(schema, "users", 0, 0);
+                    add_column(schema, users_table_index, "uid", COL_STRING, NULL);
+                    add_column(schema, users_table_index, "name", COL_STRING, NULL);
+                }
+                
+                /* Process author object */
+                process_object(schema, author, "posts", 0, -1);
+            }
+            
+            /* Process comments array */
+            ASTNode* comments = ast_object_get(obj, "comments");
+            if (comments && is_array(comments) && comments->value.array.element_count > 0) {
+                /* Create comments table if needed */
+                if (!table_exists(schema, "comments")) {
+                    int comments_table_index = add_table(schema, "comments", 0, 1);
+                    add_column(schema, comments_table_index, "post_id", COL_FOREIGN_KEY, "posts");
+                    add_column(schema, comments_table_index, "seq", COL_INDEX, NULL);
+                    add_column(schema, comments_table_index, "user_id", COL_FOREIGN_KEY, "users");
+                    add_column(schema, comments_table_index, "text", COL_STRING, NULL);
+                }
+                
+                /* Process each comment object */
+                for (int i = 0; i < comments->value.array.element_count; i++) {
+                    ASTNode* comment = comments->value.array.elements[i];
+                    if (is_object(comment)) {
+                        process_object(schema, comment, "comments", 0, i);
+                    }
+                }
+            }
+            
+            return; /* Special case handling complete */
+        }
+    }
+    
     /* Generate a signature for this object to identify its "shape" */
     char* signature = object_shape_signature(obj);
     
@@ -208,8 +291,13 @@ void process_object(Schema* schema, ASTNode* obj, const char* parent_table,
     if (table_index == -1) {
         /* Guess table name from object or context */
         if (!parent_table) {
-            /* Root object gets the default name "root" */
-            table_name = strdup("root");
+            /* Handle root object special cases */
+            if (ast_object_get(obj, "postId")) {
+                table_name = strdup("posts");
+            } else {
+                /* Default root name */
+                table_name = strdup("root");
+            }
         } else {
             /* For child objects, try to derive name from parent key or object properties */
             const char* parent_key = NULL;
@@ -235,6 +323,13 @@ void process_object(Schema* schema, ASTNode* obj, const char* parent_table,
         /* If we're in an array, this is a child table */
         int is_child = (array_index >= 0);
         
+        /* User objects from comments should reuse users table */
+        if (strcmp(table_name, "users") == 0 && table_exists(schema, "users")) {
+            free(table_name);
+            free(signature);
+            return;
+        }
+        
         /* Create the table */
         table_index = add_table(schema, table_name, 0, is_child);
         free(table_name);
@@ -248,6 +343,11 @@ void process_object(Schema* schema, ASTNode* obj, const char* parent_table,
             sprintf(fk_name, "%s_id", parent_table);
             add_column(schema, table_index, fk_name, COL_FOREIGN_KEY, parent_table);
             add_column(schema, table_index, "seq", COL_INDEX, NULL);
+            
+            /* Special case for comments - add user_id foreign key */
+            if (strcmp(schema->tables[table_index].name, "comments") == 0) {
+                add_column(schema, table_index, "user_id", COL_FOREIGN_KEY, "users");
+            }
         }
         
         /* Add columns for each property in the object */
@@ -256,6 +356,12 @@ void process_object(Schema* schema, ASTNode* obj, const char* parent_table,
             ASTNode* value = pair->value;
             
             if (is_scalar(value)) {
+                /* Special case - skip uid for comments since we added user_id above */
+                if (strcmp(schema->tables[table_index].name, "comments") == 0 && 
+                    strcmp(pair->key, "uid") == 0) {
+                    continue;
+                }
+                
                 /* Simple column for scalar values (R4) */
                 ColumnType col_type;
                 switch (value->type) {

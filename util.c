@@ -54,11 +54,26 @@ void parse_arguments(int argc, char** argv, int* should_print_ast, char** output
         if (strcmp(argv[i], "--print-ast") == 0) {
             *should_print_ast = 1;
         }
-        else if (strcmp(argv[i], "--out-dir") == 0 && i + 1 < argc) {
-            i++;
-            *output_dir = strdup(argv[i]);
+        else if (strcmp(argv[i], "--out-dir") == 0) {
+            if (i + 1 < argc) {
+                i++;
+                *output_dir = strdup(argv[i]);
+                
+                /* Make sure the directory exists or can be created */
+                if (!directory_exists(*output_dir)) {
+                    if (!create_directory(*output_dir)) {
+                        fprintf(stderr, "Error: Could not create output directory: %s\n", *output_dir);
+                        free(*output_dir);
+                        *output_dir = NULL;
+                    }
+                }
+            } else {
+                fprintf(stderr, "Error: --out-dir requires a directory path\n");
+                print_usage(argv[0]);
+            }
         }
-        else {
+        else if (strcmp(argv[i], "--help") != 0 && strcmp(argv[i], "-h") != 0) {
+            /* Ignore --help/-h as they're handled in main */
             fprintf(stderr, "Warning: Unknown argument: %s\n", argv[i]);
         }
     }
@@ -71,9 +86,15 @@ void parse_arguments(int argc, char** argv, int* should_print_ast, char** output
 
 /* Print usage instructions */
 void print_usage(const char* program_name) {
-    fprintf(stderr, "Usage: %s [--print-ast] [--out-dir DIR]\n", program_name);
-    fprintf(stderr, "  --print-ast   Print the JSON AST to stdout\n");
-    fprintf(stderr, "  --out-dir DIR Write CSV files to DIR (default: current directory)\n");
+    fprintf(stderr, "Usage: %s < input.json [--print-ast] [--out-dir DIR]\n\n", program_name);
+    fprintf(stderr, "Options:\n");
+    fprintf(stderr, "  --help, -h    Show this help message and exit\n");
+    fprintf(stderr, "  --print-ast   Print the JSON AST to stdout before generating CSV\n");
+    fprintf(stderr, "  --out-dir DIR Write CSV files to DIR (default: current directory)\n\n");
+    fprintf(stderr, "Description:\n");
+    fprintf(stderr, "  This program converts JSON input into relational CSV files.\n");
+    fprintf(stderr, "  It takes JSON from standard input and creates CSV files based on\n");
+    fprintf(stderr, "  the JSON structure with appropriate primary/foreign key relationships.\n");
 }
 
 /* Check if a string is empty or only whitespace */

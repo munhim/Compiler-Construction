@@ -20,6 +20,15 @@ int main(int argc, char** argv) {
     /* Parse command line arguments */
     int should_print_ast = 0;
     char* output_dir = NULL;
+    
+    /* Handle help flag explicitly before parsing other args */
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+            print_usage(argv[0]);
+            return 0;
+        }
+    }
+    
     parse_arguments(argc, argv, &should_print_ast, &output_dir);
     
     /* Read from stdin by default */

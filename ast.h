@@ -66,6 +66,7 @@ ASTNode* create_null_node();
 KeyValuePair* create_key_value_pair(char* key, ASTNode* value);
 
 /* AST utility functions */
+void print_ast_node(ASTNode* node, int indent, char* prefix);
 void print_ast(ASTNode* node, int indent);
 void free_ast(ASTNode* node);
 

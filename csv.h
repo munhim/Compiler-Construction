@@ -15,7 +15,7 @@ void write_csv_file(Schema* schema, int table_index, const char* output_dir);
 
 /* Write a CSV row for an object */
 void write_object_csv(Schema* schema, int table_index, ASTNode* obj, FILE* fp, 
-                      long parent_id, int index, const char* parent_table);
+                      long parent_id, int index, const char* parent_table, const char* output_dir);
 
 /* Write a scalar array junction table */
 void write_scalar_array_csv(Schema* schema, int table_index, ASTNode* array, 

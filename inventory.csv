@@ -1,6 +1,0 @@
-id,inventory_id,seq,issue,title,price
-18,35,0,"978-123456","Programming in C",29.99
-24,35,1,"978-654321","Database Design",39.99
-29,35,0,"Jan 2023","Tech Monthly",5.99
-33,35,1,"Feb 2023","Tech Monthly",5.99
-35
