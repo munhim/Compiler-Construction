@@ -1,0 +1,40 @@
+modules = ["c"]
+
+[nix]
+channel = "stable-24_05"
+packages = ["flex", "bison"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "JSON2RelCSV Compiler and Runner"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "build_and_test"
+
+[[workflows.workflow]]
+name = "JSON2RelCSV Compiler and Runner"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "make && ./json2relcsv < tests/simple.json --print-ast"
+
+[[workflows.workflow]]
+name = "build_and_test"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd /home/runner && make && ./json2relcsv < tests/simple.json && cat *.csv"
+
+[deployment]
+run = ["sh", "-c", "make && ./json2relcsv < tests/simple.json --print-ast"]

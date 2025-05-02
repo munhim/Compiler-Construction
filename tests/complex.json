@@ -1,0 +1,43 @@
+{
+    "store": {
+        "name": "BookStore",
+        "location": "Downtown",
+        "employees": [
+            {"id": 1, "name": "John", "position": "Manager"},
+            {"id": 2, "name": "Jane", "position": "Sales"}
+        ],
+        "inventory": {
+            "books": [
+                {"isbn": "978-123456", "title": "Programming in C", "price": 29.99, "authors": ["Smith", "Johnson"]},
+                {"isbn": "978-654321", "title": "Database Design", "price": 39.99, "authors": ["Williams"]}
+            ],
+            "magazines": [
+                {"issue": "Jan 2023", "title": "Tech Monthly", "price": 5.99},
+                {"issue": "Feb 2023", "title": "Tech Monthly", "price": 5.99}
+            ]
+        },
+        "hours": {
+            "monday": "9-5",
+            "tuesday": "9-5",
+            "wednesday": "9-5",
+            "thursday": "9-5",
+            "friday": "9-5",
+            "saturday": "10-3",
+            "sunday": "closed"
+        }
+    },
+    "customer": {
+        "id": 123,
+        "name": "Alice",
+        "orders": [
+            {
+                "orderId": "A001",
+                "date": "2023-01-15",
+                "items": [
+                    {"product": "book", "isbn": "978-123456", "quantity": 1},
+                    {"product": "magazine", "issue": "Jan 2023", "quantity": 2}
+                ]
+            }
+        ]
+    }
+}
