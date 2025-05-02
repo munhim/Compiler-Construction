@@ -52,8 +52,11 @@ int main(int argc, char** argv) {
     
     /* Print AST if requested */
     if (should_print_ast) {
-        printf("AST:\n");
+        printf("\n%s===== Standard AST =====%s\n", "\033[1;37m", "\033[0m");
         print_ast(ast, 0);
+        
+        printf("\n%s===== Enhanced Visual AST =====%s\n\n", "\033[1;37m", "\033[0m");
+        print_visual_ast(ast, 0, 1);
     }
     
     /* Generate schema from AST */

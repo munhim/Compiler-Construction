@@ -447,6 +447,75 @@ void print_ast(ASTNode* node, int indent) {
     print_ast_node(node, indent, NULL);
 }
 
+/* Print a visual tree representation of the AST with unicode box drawing */
+void print_visual_ast(ASTNode* node, int indent, int is_last) {
+    if (!node) return;
+    
+    /* Print indentation and branch characters */
+    for (int i = 0; i < indent - 1; i++) {
+        printf("%s", "│   ");
+    }
+    
+    if (indent > 0) {
+        printf("%s", is_last ? "└── " : "├── ");
+    }
+    
+    /* Print node according to its type with color */
+    switch(node->type) {
+        case NODE_OBJECT:
+            printf("\033[1;33mOBJECT\033[0m (%d pairs)\n", node->value.object.pair_count);
+            for (int i = 0; i < node->value.object.pair_count; i++) {
+                KeyValuePair* pair = node->value.object.pairs[i];
+                
+                /* Print the key as a branch */
+                for (int j = 0; j < indent; j++) {
+                    printf("%s", "│   ");
+                }
+                printf("%s", "├── ");
+                printf("\033[1;36mKey: \"%s\"\033[0m\n", pair->key);
+                
+                /* Print the value */
+                print_visual_ast(pair->value, indent + 1, 
+                              i == node->value.object.pair_count - 1 && 
+                              pair->value->type != NODE_OBJECT && 
+                              pair->value->type != NODE_ARRAY);
+            }
+            break;
+            
+        case NODE_ARRAY:
+            printf("\033[1;35mARRAY\033[0m (%d elements)\n", node->value.array.element_count);
+            for (int i = 0; i < node->value.array.element_count; i++) {
+                print_visual_ast(node->value.array.elements[i], indent + 1, 
+                              i == node->value.array.element_count - 1);
+            }
+            break;
+            
+        case NODE_STRING:
+            printf("\033[1;32mSTRING:\033[0m \"%s\"\n", node->value.string_val);
+            break;
+            
+        case NODE_NUMBER:
+            printf("\033[1;34mNUMBER:\033[0m %f\n", node->value.num_val);
+            break;
+            
+        case NODE_INTEGER:
+            printf("\033[1;34mINTEGER:\033[0m %ld\n", node->value.int_val);
+            break;
+            
+        case NODE_BOOLEAN:
+            printf("\033[1;31mBOOLEAN:\033[0m %s\n", 
+                  node->value.bool_val ? "true" : "false");
+            break;
+            
+        case NODE_NULL:
+            printf("\033[1;37mNULL\033[0m\n");
+            break;
+            
+        default:
+            printf("UNKNOWN NODE TYPE\n");
+    }
+}
+
 /* Free memory for an AST node and all its children */
 void free_ast(ASTNode* node) {
     if (!node) return;

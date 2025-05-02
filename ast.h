@@ -70,6 +70,9 @@ void print_ast_node(ASTNode* node, int indent, char* prefix);
 void print_ast(ASTNode* node, int indent);
 void free_ast(ASTNode* node);
 
+/* Visual AST display with enhanced formatting */
+void print_visual_ast(ASTNode* node, int indent, int is_last);
+
 /* Find an object's key by name */
 ASTNode* ast_object_get(ASTNode* obj, const char* key);
 

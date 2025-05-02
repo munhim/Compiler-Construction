@@ -1,0 +1,23 @@
+{
+    "orderId": 1001,
+    "customer": {
+        "id": "C123",
+        "name": "John Doe"
+    },
+    "items": [
+        {
+            "sku": "ABC123",
+            "name": "Widget",
+            "price": 19.99,
+            "quantity": 2
+        },
+        {
+            "sku": "XYZ789",
+            "name": "Gadget",
+            "price": 29.99,
+            "quantity": 1
+        }
+    ],
+    "total": 69.97,
+    "date": "2023-05-15"
+}

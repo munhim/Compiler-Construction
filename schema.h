@@ -59,6 +59,9 @@ void add_column(Schema* schema, int table_index, const char* name, ColumnType ty
 /* Check if a table with the given name already exists */
 int table_exists(Schema* schema, const char* name);
 
+/* Check if a column exists in a table */
+int column_exists(Schema* schema, int table_index, const char* name);
+
 /* Check if a table with the given signature already exists */
 int table_with_signature_exists(Schema* schema, const char* signature);
 

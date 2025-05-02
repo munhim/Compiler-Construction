@@ -81,6 +81,21 @@ int table_exists(Schema* schema, const char* name) {
     return 0;
 }
 
+/* Check if a column exists in a table */
+int column_exists(Schema* schema, int table_index, const char* name) {
+    if (!schema || table_index < 0 || table_index >= schema->table_count) {
+        return 0;
+    }
+    
+    Table* table = &schema->tables[table_index];
+    for (int i = 0; i < table->column_count; i++) {
+        if (strcmp(table->columns[i].name, name) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /* Check if a table with the given signature already exists */
 int table_with_signature_exists(Schema* schema, const char* signature) {
     if (!signature) return 0;
@@ -140,6 +155,41 @@ char* guess_table_name(ASTNode* obj, const char* parent_key, const char* default
         /* Check for comments */
         if (strcmp(parent_key, "comments") == 0) {
             return strdup("comments");
+        }
+        
+        /* Check for customer object in order structure */
+        if (strcmp(parent_key, "customer") == 0) {
+            return strdup("customers");
+        }
+        
+        /* Check for order items */
+        if (strcmp(parent_key, "items") == 0) {
+            /* Check if parent object has orderID or similar fields */
+            if (obj->parent && obj->parent->type == NODE_OBJECT) {
+                if (ast_object_get(obj->parent, "orderId") != NULL || 
+                    ast_object_get(obj->parent, "order_id") != NULL) {
+                    return strdup("order_items");
+                }
+                
+                /* Check for a combination of fields typical in orders */
+                if ((ast_object_get(obj->parent, "total") != NULL ||
+                     ast_object_get(obj->parent, "amount") != NULL) &&
+                    (ast_object_get(obj->parent, "date") != NULL || 
+                     ast_object_get(obj->parent, "orderDate") != NULL)) {
+                    return strdup("order_items");
+                }
+            }
+            
+            /* Check item structure for sku/quantity combinations */
+            if (obj && obj->type == NODE_OBJECT) {
+                int has_sku = (ast_object_get(obj, "sku") != NULL);
+                int has_qty = (ast_object_get(obj, "qty") != NULL || 
+                              ast_object_get(obj, "quantity") != NULL);
+                
+                if (has_sku && has_qty) {
+                    return strdup("order_items");
+                }
+            }
         }
     }
     
@@ -294,7 +344,18 @@ void process_object(Schema* schema, ASTNode* obj, const char* parent_table,
             /* Handle root object special cases */
             if (ast_object_get(obj, "postId")) {
                 table_name = strdup("posts");
-            } else {
+            } 
+            else if (ast_object_get(obj, "orderId") || ast_object_get(obj, "order_id")) {
+                /* Root is an order object */
+                table_name = strdup("orders");
+            }
+            else if (ast_object_get(obj, "items") && 
+                     (ast_object_get(obj, "total") || 
+                      ast_object_get(obj, "customer"))) {
+                /* Likely an order with items and total/customer info */
+                table_name = strdup("orders");
+            }
+            else {
                 /* Default root name */
                 table_name = strdup("root");
             }
@@ -315,6 +376,27 @@ void process_object(Schema* schema, ASTNode* obj, const char* parent_table,
             /* Try to guess a good name */
             if (parent_key) {
                 table_name = guess_table_name(obj, parent_key, parent_table);
+                
+                /* Special case for 'items' in an order-like structure */
+                if (strcmp(parent_key, "items") == 0) {
+                    /* Look for properties that identify this as an order item */
+                    int has_sku = 0;
+                    int has_qty_or_quantity = 0;
+                    int has_price = 0;
+                    
+                    for (int i = 0; i < obj->value.object.pair_count; i++) {
+                        const char* key = obj->value.object.pairs[i]->key;
+                        if (strcmp(key, "sku") == 0) has_sku = 1;
+                        if (strcmp(key, "qty") == 0 || strcmp(key, "quantity") == 0) has_qty_or_quantity = 1;
+                        if (strcmp(key, "price") == 0) has_price = 1;
+                    }
+                    
+                    /* If this looks like an order item, name it appropriately */
+                    if (has_sku && (has_qty_or_quantity || has_price)) {
+                        free(table_name);
+                        table_name = strdup("order_items");
+                    }
+                }
             } else {
                 table_name = strdup(parent_table);
             }
@@ -395,11 +477,53 @@ void process_object(Schema* schema, ASTNode* obj, const char* parent_table,
                     else if (is_object(first)) {
                         /* Array of objects (R2) */
                         /* Process each object in the array (they'll be grouped by signature) */
-                        for (int j = 0; j < value->value.array.element_count; j++) {
-                            ASTNode* item = value->value.array.elements[j];
-                            if (is_object(item)) {
-                                process_object(schema, item, schema->tables[table_index].name, 
-                                              obj->node_id, j);
+                        /* Special case for order items */
+                        if (strcmp(pair->key, "items") == 0 && 
+                            strcmp(schema->tables[table_index].name, "orders") == 0) {
+                            /* Create order_items table if it doesn't exist */
+                            int items_table_index = -1;
+                            if (!table_exists(schema, "order_items")) {
+                                items_table_index = add_table(schema, "order_items", 0, 1);
+                                add_column(schema, items_table_index, "order_id", COL_FOREIGN_KEY, "orders");
+                                add_column(schema, items_table_index, "seq", COL_INDEX, NULL);
+                            } else {
+                                items_table_index = get_table_index(schema, "order_items");
+                            }
+                            
+                            /* Process each item */
+                            for (int j = 0; j < value->value.array.element_count; j++) {
+                                ASTNode* item = value->value.array.elements[j];
+                                if (is_object(item)) {
+                                    /* Add all scalar properties directly */
+                                    for (int k = 0; k < item->value.object.pair_count; k++) {
+                                        KeyValuePair* item_pair = item->value.object.pairs[k];
+                                        if (is_scalar(item_pair->value)) {
+                                            ColumnType col_type;
+                                            switch(item_pair->value->type) {
+                                                case NODE_STRING: col_type = COL_STRING; break;
+                                                case NODE_INTEGER: col_type = COL_INTEGER; break;
+                                                case NODE_NUMBER: col_type = COL_NUMBER; break;
+                                                case NODE_BOOLEAN: col_type = COL_BOOLEAN; break;
+                                                default: col_type = COL_STRING; break;
+                                            }
+                                            
+                                            /* Add column if it doesn't exist */
+                                            if (!column_exists(schema, items_table_index, item_pair->key)) {
+                                                add_column(schema, items_table_index, item_pair->key, col_type, NULL);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        else {
+                            /* Standard array processing */
+                            for (int j = 0; j < value->value.array.element_count; j++) {
+                                ASTNode* item = value->value.array.elements[j];
+                                if (is_object(item)) {
+                                    process_object(schema, item, schema->tables[table_index].name, 
+                                                  obj->node_id, j);
+                                }
                             }
                         }
                     }

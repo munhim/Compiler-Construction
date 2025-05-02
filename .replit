@@ -28,6 +28,10 @@ args = "Test Simple JSON Files"
 task = "workflow.run"
 args = "Document Example Test"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Test Order Example"
+
 [[workflows.workflow]]
 name = "JSON2RelCSV Compiler and Runner"
 author = "agent"
@@ -69,6 +73,17 @@ author = "agent"
 task = "shell.exec"
 args = """
 make && mkdir -p output && rm -f output/*.csv && ./json2relcsv < tests/document_example.json --out-dir output && echo -e \"
+Generated CSV files:\" && ls -la output/*.csv && echo -e \"
+Output contents:\" && cat output/*.csv"""
+
+[[workflows.workflow]]
+name = "Test Order Example"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = """
+make && mkdir -p output && rm -f output/*.csv && ./json2relcsv < tests/order_example.json --print-ast --out-dir output && echo -e \"
 Generated CSV files:\" && ls -la output/*.csv && echo -e \"
 Output contents:\" && cat output/*.csv"""
 
