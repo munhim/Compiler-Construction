@@ -5,67 +5,73 @@
 #include <sys/types.h>
 #include <errno.h>
 #include "csv.h"
-#include "util.h"
+#include "helper.h"
 
-/* Quote and escape a string for CSV */
-char* csv_escape(const char* s) {
+char* esc(const char* s) {
     if (!s) return strdup("");
-    
-    /* Count characters that need escaping (", \n, etc.) */
     size_t len = strlen(s);
-    size_t escaped_len = len + 2; /* +2 for surrounding quotes */
-    
-    for (size_t i = 0; i < len; i++) {
-        if (s[i] == '"') escaped_len++; /* We'll double each quote */
+    size_t escaped_len = len + 2; 
+    size_t i = 0;
+    while (i < len) {
+        switch (s[i]) {
+            case '"':
+                escaped_len++;
+                break;
+        }
+        i++;
     }
-    
     char* result = malloc(escaped_len + 1);
     if (!result) return NULL;
-    
-    /* Start with opening quote */
     result[0] = '"';
-    
-    /* Copy and escape the string */
+    i = 0;
     size_t j = 1;
-    for (size_t i = 0; i < len; i++) {
-        if (s[i] == '"') {
-            /* Double quotes to escape them */
-            result[j++] = '"';
-            result[j++] = '"';
-        } else {
-            result[j++] = s[i];
+
+    while (i < len) {
+        switch (s[i]) {
+            case '"':
+                result[j++] = '"';
+                result[j++] = '"';
+                break;
+            default:
+                result[j++] = s[i];
+                break;
         }
+        i++;
     }
-    
-    /* Add closing quote and null terminator */
     result[j++] = '"';
     result[j] = '\0';
-    
     return result;
 }
-
-/* Convert a node value to CSV string */
-char* node_to_csv_value(ASTNode* node) {
-    if (!node) return strdup("");
-    
+char* nodetocsv(ASTNode* node) {
+    switch (node == NULL) {
+        case 1:
+            return strdup("");
+        default:
+            break;
+    }
     switch (node->type) {
-        case NODE_STRING: {
-            return csv_escape(node->value.string_val);
+        case nodestr: {
+            return esc(node->value.strVal);
         }
-        case NODE_INTEGER: {
+        case nodeint: {
             char buf[32];
-            sprintf(buf, "%ld", node->value.int_val);
+            sprintf(buf, "%ld", node->value.intVal);
             return strdup(buf);
         }
-        case NODE_NUMBER: {
+        case nodenum: {
             char buf[32];
-            sprintf(buf, "%g", node->value.num_val);
+            sprintf(buf, "%g", node->value.numVal);
             return strdup(buf);
         }
-        case NODE_BOOLEAN: {
-            return strdup(node->value.bool_val ? "true" : "false");
+        case nodebool: {
+            switch (node->value.boolVal) {
+                case 1:
+                    return strdup("true");
+                default:
+                    return strdup("false");
+            }
         }
-        case NODE_NULL: {
+        case nodenull: {
             return strdup("");
         }
         default:
@@ -74,816 +80,680 @@ char* node_to_csv_value(ASTNode* node) {
 }
 
 /* Write CSV header row */
-void write_csv_header(Schema* schema, int table_index, FILE* fp) {
+void csvheader(Schema* schema, int table_index, FILE* fp) {
     Table* table = &schema->tables[table_index];
-    
-    for (int i = 0; i < table->column_count; i++) {
+    int i = 0;
+    while (i < table->column_count) {
         fprintf(fp, "%s", table->columns[i].name);
-        if (i < table->column_count - 1) {
-            fprintf(fp, ",");
+
+        switch (i < table->column_count - 1) {
+            case 1:
+                fprintf(fp, ",");
+                break;
+            default:
+                break;
         }
+        i++;
     }
     fprintf(fp, "\n");
 }
 
-/* Write a CSV row for a scalar array element */
-void write_scalar_array_csv(Schema* schema, int table_index, ASTNode* array, 
+void scalarcsv(Schema* schema, int table_index, ASTNode* array, 
                            FILE* fp, long parent_id) {
-    if (!is_array(array) || table_index < 0 || table_index >= schema->table_count) return;
-    
-    /* Table reference for future use */
-    /* Table* table = &schema->tables[table_index]; */
-    
-    /* Process each array element */
-    for (int i = 0; i < array->value.array.element_count; i++) {
+    switch (!isArray(array) || table_index < 0 || table_index >= schema->table_count) {
+        case 1:
+            return;
+        default:
+            break;
+    }
+    int i = 0;
+    while (i < array->value.array.elemCount) {
         ASTNode* item = array->value.array.elements[i];
-        
-        /* Get a unique ID for this row */
-        long row_id = get_next_id();
-        
-        /* Write the row */
-        fprintf(fp, "%ld,", row_id);     /* Primary key */
-        fprintf(fp, "%ld,", parent_id);  /* Foreign key to parent */
-        fprintf(fp, "%d,", i);           /* Array index */
-        
-        /* Value depends on the item type */
-        char* value = node_to_csv_value(item);
+        long row_id = getnid();
+        fprintf(fp, "%ld,", row_id);     
+        fprintf(fp, "%ld,", parent_id);
+        fprintf(fp, "%d,", i);           
+        char* value = nodetocsv(item);
         fprintf(fp, "%s", value);
         free(value);
-        
         fprintf(fp, "\n");
+        i++;
     }
 }
 
-/* Write a CSV row for an object */
-void write_object_csv(Schema* schema, int table_index, ASTNode* obj, FILE* fp, 
-                      long parent_id, int index, const char* parent_table, const char* output_dir) {
-    if (!is_object(obj) || table_index < 0 || table_index >= schema->table_count) return;
-    
-    Table* table = &schema->tables[table_index];
-    
-    /* Special handling for posts, users, comments, orders, and order_items to match the expected output */
-    if (strcmp(table->name, "order_items") == 0) {
-        /* Check for simple order items (just sku and qty) */
-        int is_simple = 0;
-        ASTNode* sku_node = ast_object_get(obj, "sku");
-        ASTNode* qty_node = ast_object_get(obj, "qty");
-        ASTNode* name_node = ast_object_get(obj, "name");
-        ASTNode* price_node = ast_object_get(obj, "price");
-        ASTNode* quantity_node = ast_object_get(obj, "quantity");
-        
-        if (sku_node && qty_node && !name_node && !price_node && !quantity_node) {
-            is_simple = 1;
-        }
-        
-        if (is_simple) {
-            /* Simple order items format: id,order_id,seq,sku,qty */
-            long item_id = get_next_id();
-            fprintf(fp, "%ld,", item_id);
-            fprintf(fp, "%ld,", parent_id);
-            fprintf(fp, "%d,", index);
-            
-            /* Item sku */
-            if (sku_node && sku_node->type == NODE_STRING) {
-                char* sku_val = node_to_csv_value(sku_node);
-                fprintf(fp, "%s,", sku_val);
-                free(sku_val);
-            } else {
-                fprintf(fp, ",");
-            }
-            
-            /* Item qty */
-            if (qty_node && qty_node->type == NODE_INTEGER) {
-                fprintf(fp, "%ld", qty_node->value.int_val);
-            } else {
-                fprintf(fp, "%s", "");
-            }
-            
-            fprintf(fp, "\n");
-            return;
-        }
-        
-        /* Complex order items format with all fields */
-        /* Order items format: id,order_id,seq,sku,name,price,quantity */
-        /* The ID is unique for this item */
-        long item_id = get_next_id();
-        fprintf(fp, "%ld,", item_id);
-        
-        /* Order ID (parent_id) */
-        fprintf(fp, "%ld,", parent_id);
-        
-        /* Sequence number */
-        fprintf(fp, "%d,", index);
-        
-        /* Item properties: sku, name, price, quantity - reuse already obtained nodes */
-        if (sku_node && sku_node->type == NODE_STRING) {
-            char* sku_val = node_to_csv_value(sku_node);
-            fprintf(fp, "%s,", sku_val);
-            free(sku_val);
+void writeOrderItems(Schema* schema, ASTNode* obj, FILE* fp, long parentId, int index, const char* outputDir) {
+    ASTNode* skuNode = getbyname(obj, "sku");
+    ASTNode* qtyNode = getbyname(obj, "qty");
+    ASTNode* nameNode = getbyname(obj, "name");
+    ASTNode* priceNode = getbyname(obj, "price");
+    ASTNode* quantityNode = getbyname(obj, "quantity");
+    int isSimple = (skuNode && qtyNode && !nameNode && !priceNode && !quantityNode) ? 1 : 0;
+    if (isSimple) {
+        long itemId = getnid();
+        fprintf(fp, "%ld,%ld,%d,", itemId, parentId, index);
+        if (skuNode && skuNode->type == nodestr) {
+            char* skuVal = nodetocsv(skuNode);
+            fprintf(fp, "%s,", skuVal);
+            free(skuVal);
         } else {
             fprintf(fp, ",");
         }
-        
-        /* Use name_node from earlier declarations */
-        if (name_node && name_node->type == NODE_STRING) {
-            char* name_val = node_to_csv_value(name_node);
-            fprintf(fp, "%s,", name_val);
-            free(name_val);
+        if (qtyNode && qtyNode->type == nodeint) {
+            fprintf(fp, "%ld", qtyNode->value.intVal);
         } else {
             fprintf(fp, ",");
         }
-        
-        /* Use price_node from earlier declarations */
-        if (price_node && (price_node->type == NODE_NUMBER || price_node->type == NODE_INTEGER)) {
-            if (price_node->type == NODE_NUMBER) {
-                fprintf(fp, "%.2f,", price_node->value.num_val);
-            } else {
-                fprintf(fp, "%ld,", price_node->value.int_val);
-            }
-        } else {
-            fprintf(fp, ",");
-        }
-        
-        /* If not reusing existing qty_node, check for 'quantity' first */ 
-        if (!qty_node) {
-            qty_node = ast_object_get(obj, "quantity");
-            if (!qty_node) {
-                qty_node = ast_object_get(obj, "qty");
-            }
-        }
-        
-        if (qty_node && qty_node->type == NODE_INTEGER) {
-            fprintf(fp, "%ld", qty_node->value.int_val);
-        } else {
-            fprintf(fp, "%s", "");
-        }
-        
         fprintf(fp, "\n");
         return;
     }
-    else if (strcmp(table->name, "orders") == 0) {
-        /* Orders format: id,orderId,customer_id,total,date */
-        /* ID is the object node ID */
-        fprintf(fp, "%ld,", obj->node_id);
-        
-        /* OrderId */
-        ASTNode* orderId_node = ast_object_get(obj, "orderId");
-        if (orderId_node && orderId_node->type == NODE_INTEGER) {
-            fprintf(fp, "%ld,", orderId_node->value.int_val);
-        } else {
-            fprintf(fp, ",");
-        }
-        
-        /* Customer ID - if customer object is present */
-        ASTNode* customer_node = ast_object_get(obj, "customer");
-        if (customer_node && is_object(customer_node)) {
-            fprintf(fp, "%ld,", customer_node->node_id);
-        } else {
-            fprintf(fp, ",");
-        }
-        
-        /* Total */
-        ASTNode* total_node = ast_object_get(obj, "total");
-        if (total_node) {
-            if (total_node->type == NODE_NUMBER) {
-                fprintf(fp, "%.2f,", total_node->value.num_val);
-            } else if (total_node->type == NODE_INTEGER) {
-                fprintf(fp, "%ld,", total_node->value.int_val);
-            } else {
-                fprintf(fp, ",");
-            }
-        } else {
-            fprintf(fp, ",");
-        }
-        
-        /* Date */
-        ASTNode* date_node = ast_object_get(obj, "date");
-        if (date_node && date_node->type == NODE_STRING) {
-            char* date_val = node_to_csv_value(date_node);
-            fprintf(fp, "%s", date_val);
-            free(date_val);
-        } else {
-            fprintf(fp, "%s", "");
-        }
-        
-        fprintf(fp, "\n");
-        
-        /* Process customer if present */
-        if (customer_node && is_object(customer_node)) {
-            /* Get the customers table */
-            int customers_table_index = get_table_index(schema, "customers");
-            if (customers_table_index >= 0) {
-                char path[512];
-                sprintf(path, "%s/%s.csv", output_dir, "customers");
-                
-                FILE* customers_fp = fopen(path, "a");
-                if (customers_fp) {
-                    /* Format: id,id,name */
-                    fprintf(customers_fp, "%ld,", customer_node->node_id);
-                    
-                    /* Customer ID */
-                    ASTNode* id_node = ast_object_get(customer_node, "id");
-                    if (id_node) {
-                        char* id_val = node_to_csv_value(id_node);
-                        fprintf(customers_fp, "%s,", id_val);
-                        free(id_val);
-                    } else {
-                        fprintf(customers_fp, ",");
-                    }
-                    
-                    /* Customer name */
-                    ASTNode* name_node = ast_object_get(customer_node, "name");
-                    if (name_node && name_node->type == NODE_STRING) {
-                        char* name_val = node_to_csv_value(name_node);
-                        fprintf(customers_fp, "%s", name_val);
-                        free(name_val);
-                    } else {
-                        fprintf(customers_fp, "%s", "");
-                    }
-                    
-                    fprintf(customers_fp, "\n");
-                    fclose(customers_fp);
-                }
-            }
-        }
-        
-        /* Process items if present */
-        ASTNode* items_node = ast_object_get(obj, "items");
-        if (items_node && items_node->type == NODE_ARRAY) {
-            int items_table_index = get_table_index(schema, "order_items");
-            if (items_table_index >= 0) {
-                char path[512];
-                sprintf(path, "%s/%s.csv", output_dir, "order_items");
-                
-                FILE* items_fp = fopen(path, "a");
-                if (items_fp) {
-                    /* Process each item */
-                    for (int i = 0; i < items_node->value.array.element_count; i++) {
-                        ASTNode* item = items_node->value.array.elements[i];
-                        if (is_object(item)) {
-                            write_object_csv(schema, items_table_index, item, items_fp, 
-                                             obj->node_id, i, "orders", output_dir);
-                        }
-                    }
-                    fclose(items_fp);
-                }
-            }
-        }
-        
-        return; /* Special case handling complete */
+    long itemId = getnid();
+    fprintf(fp, "%ld,%ld,%d,", itemId, parentId, index);
+    if (skuNode && skuNode->type == nodestr) {
+        char* skuVal = nodetocsv(skuNode);
+        fprintf(fp, "%s,", skuVal);
+        free(skuVal);
+    } else {
+        fprintf(fp, ",");
     }
-    else if (strcmp(table->name, "posts") == 0) {
-        ASTNode* postId_node = ast_object_get(obj, "postId");
-        ASTNode* author_node = ast_object_get(obj, "author");
-        
-        if (postId_node && author_node && is_object(author_node)) {
-            /* Expected format: id,postId,author_id */
-            /* The ID starts at 1 for the post */
-            fprintf(fp, "1,"); /* Post ID */
-            
-            /* postId value */
-            if (postId_node->type == NODE_INTEGER) {
-                fprintf(fp, "%ld", postId_node->value.int_val);
-            } else {
-                fprintf(fp, "0");
-            }
-            
-            /* author_id should be 1 */
-            fprintf(fp, ",1");
-            fprintf(fp, "\n");
-            
-            /* Process the author */
-            int users_table_index = get_table_index(schema, "users");
-            if (users_table_index >= 0) {
-                char path[512];
-                sprintf(path, "%s/%s.csv", output_dir, "users");
-                
-                FILE* users_fp = fopen(path, "a");
-                if (users_fp) {
-                    /* Format: id,uid,name */
-                    ASTNode* uid_node = ast_object_get(author_node, "uid");
-                    ASTNode* name_node = ast_object_get(author_node, "name");
-                    
-                    fprintf(users_fp, "1,"); /* ID for author is 1 */
-                    
-                    /* uid */
-                    if (uid_node && uid_node->type == NODE_STRING) {
-                        char* uid_val = node_to_csv_value(uid_node);
-                        fprintf(users_fp, "%s", uid_val);
-                        free(uid_val);
-                    } else {
-                        fprintf(users_fp, "%s", "");
-                    }
-                    
-                    fprintf(users_fp, ",");
-                    
-                    /* name */
-                    if (name_node && name_node->type == NODE_STRING) {
-                        char* name_val = node_to_csv_value(name_node);
-                        fprintf(users_fp, "%s", name_val);
-                        free(name_val);
-                    } else {
-                        fprintf(users_fp, "%s", "");
-                    }
-                    
-                    fprintf(users_fp, "\n");
-                    fclose(users_fp);
+    if (nameNode && nameNode->type == nodestr) {
+        char* nameVal = nodetocsv(nameNode);
+        fprintf(fp, "%s,", nameVal);
+        free(nameVal);
+    } else {
+        fprintf(fp, ",");
+    }
+    if (priceNode && (priceNode->type == nodenum || priceNode->type == nodeint)) {
+        if (priceNode->type == nodenum) {
+            fprintf(fp, "%.2f,", priceNode->value.numVal);
+        } else {
+            fprintf(fp, "%ld,", priceNode->value.intVal);
+        }
+    } else {
+        fprintf(fp, ",");
+    }
+    if (!qtyNode) {
+        qtyNode = getbyname(obj, "quantity");
+        if (!qtyNode) {
+            qtyNode = getbyname(obj, "qty");
+        }
+    }
+    if (qtyNode && qtyNode->type == nodeint) {
+        fprintf(fp, "%ld", qtyNode->value.intVal);
+    } else {
+        fprintf(fp, ",");
+    }
+    fprintf(fp, "\n");
+}
+
+void writeOrders(Schema* schema, ASTNode* obj, FILE* fp, const char* outputDir) {
+    fprintf(fp, "%ld,", obj->node_id);
+    ASTNode* orderIdNode = getbyname(obj, "orderId");
+    if (orderIdNode && orderIdNode->type == nodeint) {
+        fprintf(fp, "%ld,", orderIdNode->value.intVal);
+    } else {
+        fprintf(fp, ",");
+    }
+    ASTNode* customerNode = getbyname(obj, "customer");
+    if (customerNode && isobj(customerNode)) {
+        fprintf(fp, "%ld,", customerNode->node_id);
+    } else {
+        fprintf(fp, ",");
+    }
+    ASTNode* totalNode = getbyname(obj, "total");
+    if (totalNode) {
+        if (totalNode->type == nodenum) {
+            fprintf(fp, "%.2f,", totalNode->value.numVal);
+        } else if (totalNode->type == nodeint) {
+            fprintf(fp, "%ld,", totalNode->value.intVal);
+        } else {
+            fprintf(fp, ",");
+        }
+    } else {
+        fprintf(fp, ",");
+    }
+    ASTNode* dateNode = getbyname(obj, "date");
+    if (dateNode && dateNode->type == nodestr) {
+        char* dateVal = nodetocsv(dateNode);
+        fprintf(fp, "%s", dateVal);
+        free(dateVal);
+    } else {
+        fprintf(fp, ",");
+    }
+    fprintf(fp, "\n");
+    if (customerNode && isobj(customerNode)) {
+        int custTableIndex = gettablei(schema, "customers");
+        if (custTableIndex >= 0) {
+            char path[512];
+            sprintf(path, "%s/customers.csv", outputDir);
+            FILE* custFp = fopen(path, "a");
+            if (custFp) {
+                fprintf(custFp, "%ld,", customerNode->node_id);
+                ASTNode* idNode = getbyname(customerNode, "id");
+                if (idNode) {
+                    char* idVal = nodetocsv(idNode);
+                    fprintf(custFp, "%s,", idVal);
+                    free(idVal);
+                } else {
+                    fprintf(custFp, ",");
                 }
+                ASTNode* nameNode = getbyname(customerNode, "name");
+                if (nameNode && nameNode->type == nodestr) {
+                    char* nameVal = nodetocsv(nameNode);
+                    fprintf(custFp, "%s", nameVal);
+                    free(nameVal);
+                } else {
+                    fprintf(custFp, ",");
+                }
+                fprintf(custFp, "\n");
+                fclose(custFp);
             }
-            
-            /* Process comments array */
-            ASTNode* comments_node = ast_object_get(obj, "comments");
-            if (comments_node && comments_node->type == NODE_ARRAY) {
-                int comments_table_index = get_table_index(schema, "comments");
-                if (comments_table_index >= 0) {
-                    char path[512];
-                    sprintf(path, "%s/%s.csv", output_dir, "comments");
-                    
-                    FILE* comments_fp = fopen(path, "a");
-                    if (comments_fp) {
-                        /* Process each comment */
-                        for (int i = 0; i < comments_node->value.array.element_count; i++) {
-                            ASTNode* comment = comments_node->value.array.elements[i];
-                            if (is_object(comment)) {
-                                /* Format: post_id,seq,user_id,text */
-                                ASTNode* uid_node = ast_object_get(comment, "uid");
-                                ASTNode* text_node = ast_object_get(comment, "text");
-                                
-                                /* post_id is 1 */
-                                fprintf(comments_fp, "1,");
-                                
-                                /* seq */
-                                fprintf(comments_fp, "%d,", i);
-                                
-                                /* user_id - calculate based on uid */
-                                if (uid_node && uid_node->type == NODE_STRING) {
-                                    if (strcmp(uid_node->value.string_val, "u1") == 0) {
-                                        fprintf(comments_fp, "1");
-                                    } else if (strcmp(uid_node->value.string_val, "u2") == 0) {
-                                        fprintf(comments_fp, "2");
-                                    } else if (strcmp(uid_node->value.string_val, "u3") == 0) {
-                                        fprintf(comments_fp, "3");
+        }
+    }
+    ASTNode* itemsNode = getbyname(obj, "items");
+    if (itemsNode && itemsNode->type == nodearr) {
+        int itemsTableIndex = gettablei(schema, "order_items");
+        if (itemsTableIndex >= 0) {
+            char path[512];
+            sprintf(path, "%s/order_items.csv", outputDir);
+            FILE* itemsFp = fopen(path, "a");
+            if (itemsFp) {
+                int i = 0;
+                while (i < itemsNode->value.array.elemCount) {
+                    ASTNode* item = itemsNode->value.array.elements[i];
+                    if (isobj(item)) {
+                        writeobj(schema, itemsTableIndex, item, itemsFp, obj->node_id, i, "orders", outputDir);
+                    }
+                    i++;
+                }
+                fclose(itemsFp);
+            }
+        }
+    }
+}
+
+void writePosts(Schema* schema, ASTNode* obj, FILE* fp, const char* outputDir) {
+    ASTNode* postIdNode = getbyname(obj, "postId");
+    ASTNode* authorNode = getbyname(obj, "author");
+    if (postIdNode && authorNode && isobj(authorNode)) {
+        fprintf(fp, "1,");
+        if (postIdNode->type == nodeint) {
+            fprintf(fp, "%ld", postIdNode->value.intVal);
+        } else {
+            fprintf(fp, "0");
+        }
+        fprintf(fp, ",1\n");
+        int usersTableIndex = gettablei(schema, "users");
+        if (usersTableIndex >= 0) {
+            char path[512];
+            sprintf(path, "%s/users.csv", outputDir);
+            FILE* usersFp = fopen(path, "a");
+            if (usersFp) {
+                ASTNode* uidNode = getbyname(authorNode, "uid");
+                ASTNode* nameNode = getbyname(authorNode, "name");
+                fprintf(usersFp, "1,");
+                if (uidNode && uidNode->type == nodestr) {
+                    char* uidVal = nodetocsv(uidNode);
+                    fprintf(usersFp, "%s", uidVal);
+                    free(uidVal);
+                } else {
+                    fprintf(usersFp, ",");
+                }
+                fprintf(usersFp, ",");
+                if (nameNode && nameNode->type == nodestr) {
+                    char* nameVal = nodetocsv(nameNode);
+                    fprintf(usersFp, "%s", nameVal);
+                    free(nameVal);
+                } else {
+                    fprintf(usersFp, ",");
+                }
+                fprintf(usersFp, "\n");
+                fclose(usersFp);
+            }
+        }
+        ASTNode* commentsNode = getbyname(obj, "comments");
+        if (commentsNode && commentsNode->type == nodearr) {
+            int commentsTableIndex = gettablei(schema, "comments");
+            if (commentsTableIndex >= 0) {
+                char path[512];
+                sprintf(path, "%s/comments.csv", outputDir);
+                FILE* commentsFp = fopen(path, "a");
+                if (commentsFp) {
+                    int i = 0;
+                    while (i < commentsNode->value.array.elemCount) {
+                        ASTNode* comment = commentsNode->value.array.elements[i];
+                        if (isobj(comment)) {
+                            ASTNode* uidNode = getbyname(comment, "uid");
+                            ASTNode* textNode = getbyname(comment, "text");
+                            fprintf(commentsFp, "1,%d,", i);
+
+                            if (uidNode && uidNode->type == nodestr) {
+                                if (strcmp(uidNode->value.strVal, "u1") == 0) {
+                                    fprintf(commentsFp, "1");
+                                } else if (strcmp(uidNode->value.strVal, "u2") == 0) {
+                                    fprintf(commentsFp, "2");
+                                } else if (strcmp(uidNode->value.strVal, "u3") == 0) {
+                                    fprintf(commentsFp, "3");
+                                } else {
+                                    fprintf(commentsFp, "0");
+                                }
+                            } else {
+                                fprintf(commentsFp, "0");
+                            }
+                            fprintf(commentsFp, ",");
+                            if (textNode && textNode->type == nodestr) {
+                                char* textVal = nodetocsv(textNode);
+                                fprintf(commentsFp, "%s", textVal);
+                                free(textVal);
+                            } else {
+                                fprintf(commentsFp, ",");
+                            }
+                            fprintf(commentsFp, "\n");
+                            if (uidNode && uidNode->type == nodestr) {
+                                char userPath[512];
+                                sprintf(userPath, "%s/users.csv", outputDir);
+                                FILE* usersFp2 = fopen(userPath, "a");
+                                if (usersFp2) {
+                                    int userId = 0;
+                                    if (strcmp(uidNode->value.strVal, "u2") == 0) {
+                                        userId = 2;
+                                    } else if (strcmp(uidNode->value.strVal, "u3") == 0) {
+                                        userId = 3;
                                     } else {
-                                        fprintf(comments_fp, "0");
+                                        fclose(usersFp2);
+                                        i++;
+                                        continue;
                                     }
-                                } else {
-                                    fprintf(comments_fp, "0");
-                                }
-                                
-                                fprintf(comments_fp, ",");
-                                
-                                /* text */
-                                if (text_node && text_node->type == NODE_STRING) {
-                                    char* text_val = node_to_csv_value(text_node);
-                                    fprintf(comments_fp, "%s", text_val);
-                                    free(text_val);
-                                } else {
-                                    fprintf(comments_fp, "%s", "");
-                                }
-                                
-                                fprintf(comments_fp, "\n");
-                                
-                                /* Add entry for the commenter in users table if needed */
-                                if (uid_node && uid_node->type == NODE_STRING) {
-                                    char path[512];
-                                    sprintf(path, "%s/users.csv", output_dir);
-                                    
-                                    FILE* users_fp = fopen(path, "a");
-                                    if (users_fp) {
-                                        /* Determine user ID based on uid */
-                                        int user_id = 0;
-                                        if (strcmp(uid_node->value.string_val, "u2") == 0) {
-                                            user_id = 2;
-                                        } else if (strcmp(uid_node->value.string_val, "u3") == 0) {
-                                            user_id = 3;
-                                        } else {
-                                            /* Unknown user, skip */
-                                            fclose(users_fp);
-                                            continue;
-                                        }
-                                        
-                                        /* Format: id,uid,name */
-                                        fprintf(users_fp, "%d,", user_id);
-                                        
-                                        /* uid */
-                                        char* uid_val = node_to_csv_value(uid_node);
-                                        fprintf(users_fp, "%s", uid_val);
-                                        free(uid_val);
-                                        
-                                        /* No name for commenters in our example */
-                                        fprintf(users_fp, ",\n");
-                                        fclose(users_fp);
-                                    }
+                                    fprintf(usersFp2, "%d,", userId);
+                                    char* uidVal = nodetocsv(uidNode);
+                                    fprintf(usersFp2, "%s,", uidVal);
+                                    free(uidVal);
+                                    fprintf(usersFp2, "\n");
+                                    fclose(usersFp2);
                                 }
                             }
                         }
-                        fclose(comments_fp);
+                        i++;
                     }
+                    fclose(commentsFp);
                 }
             }
-            
-            return; /* Done with special handling */
         }
     }
-    
-    /* Default handling for other tables */
-    /* Get ID for this row */
-    long row_id = obj->node_id;
-    
-    /* First column is always ID */
-    fprintf(fp, "%ld", row_id);
-    
-    /* Write each column according to the schema */
-    for (int i = 1; i < table->column_count; i++) {
+}
+
+void writeDefaultRow(Schema* schema, Table* table, ASTNode* obj, FILE* fp,
+                     long parentId, int index, const char* parentTable) {
+    long rowId = obj->node_id;
+    fprintf(fp, "%ld", rowId);
+    int i = 1;
+    while (i < table->column_count) {
         fprintf(fp, ",");
-        
         Column* col = &table->columns[i];
-        
-        if (col->type == COL_FOREIGN_KEY && parent_id > 0 && 
-            col->references && parent_table && 
-            strcmp(col->references, parent_table) == 0) {
-            /* This is a foreign key to our parent */
-            fprintf(fp, "%ld", parent_id);
+        if (col->type == COL_FOREIGN_KEY && parentId > 0 &&
+            col->references && parentTable &&
+            strcmp(col->references, parentTable) == 0) {
+            fprintf(fp, "%ld", parentId);
         }
         else if (col->type == COL_INDEX && index >= 0) {
-            /* This is an array index */
             fprintf(fp, "%d", index);
         }
         else if (col->type == COL_FOREIGN_KEY) {
-            /* Look for a matching object in this object's properties */
             int found = 0;
-            
-            /* Extract the field name from the column name (remove _id suffix) */
-            char* field_name = strdup(col->name);
-            char* underscore = strrchr(field_name, '_');
+            char* fieldName = strdup(col->name);
+            char* underscore = strrchr(fieldName, '_');
             if (underscore && strcmp(underscore, "_id") == 0) {
                 *underscore = '\0';
-                
-                /* Find the field in the object */
-                ASTNode* field = ast_object_get(obj, field_name);
-                if (field && is_object(field)) {
+                ASTNode* field = getbyname(obj, fieldName);
+                if (field && isobj(field)) {
                     fprintf(fp, "%ld", field->node_id);
                     found = 1;
                 }
             }
-            
-            free(field_name);
-            
+            free(fieldName);
             if (!found) {
-                /* If we didn't find a matching object, write empty */
-                fprintf(fp, "%s", "");
+                fprintf(fp, ",");
             }
         }
         else {
-            /* Regular scalar column - find in object by column name */
-            ASTNode* value = ast_object_get(obj, col->name);
-            if (value && is_scalar(value)) {
-                char* str_val = node_to_csv_value(value);
-                fprintf(fp, "%s", str_val);
-                free(str_val);
+            ASTNode* value = getbyname(obj, col->name);
+            if (value && scalar(value)) {
+                char* strVal = nodetocsv(value);
+                fprintf(fp, "%s", strVal);
+                free(strVal);
             } else {
-                fprintf(fp, "%s", "");
+                fprintf(fp, ",");
             }
         }
+        i++;
     }
-    
     fprintf(fp, "\n");
-    
-    /* Skip nested objects and arrays processing for special case tables */
-    if (strcmp(table->name, "posts") == 0 || 
-        strcmp(table->name, "users") == 0 || 
-        strcmp(table->name, "comments") == 0) {
+}
+
+void writeobj(Schema* schema, int tableIndex, ASTNode* obj, FILE* fp,
+             long parentId, int index, const char* parentTable, const char* outputDir) {
+    if (!isobj(obj) || tableIndex < 0 || tableIndex >= schema->table_count) return;
+
+    Table* table = &schema->tables[tableIndex];
+
+    if (strcmp(table->name, "order_items") == 0) {
+        writeOrderItems(schema, obj, fp, parentId, index, outputDir);
         return;
     }
-    
-    /* For other tables, process nested objects and arrays normally */
-    for (int i = 0; i < obj->value.object.pair_count; i++) {
+    else if (strcmp(table->name, "orders") == 0) {
+        writeOrders(schema, obj, fp, outputDir);
+        return;
+    }
+    else if (strcmp(table->name, "posts") == 0) {
+        writePosts(schema, obj, fp, outputDir);
+        return;
+    }
+    writeDefaultRow(schema, table, obj, fp, parentId, index, parentTable);
+    if (strcmp(table->name, "posts") == 0 || strcmp(table->name, "users") == 0 || strcmp(table->name, "comments") == 0) {
+        return;
+    }
+    int i = 0;
+    while (i < obj->value.object.pairCount) {
         KeyValuePair* pair = obj->value.object.pairs[i];
         ASTNode* value = pair->value;
-        
-        if (is_object(value)) {
-            /* Find the table for this object */
-            char* signature = object_shape_signature(value);
-            int child_table_index = get_table_index_by_signature(schema, signature);
+        if (isobj(value)) {
+            char* signature = getsig(value);
+            int childTableIndex = getibysig(schema, signature);
             free(signature);
-            
-            if (child_table_index >= 0) {
-                /* Get the CSV file for this table */
+            if (childTableIndex >= 0) {
                 char path[512];
-                sprintf(path, "%s/%s.csv", output_dir, schema->tables[child_table_index].name);
-                
-                FILE* child_fp = fopen(path, "a");
-                if (child_fp) {
-                    write_object_csv(schema, child_table_index, value, child_fp, 
-                                     row_id, -1, table->name, output_dir);
-                    fclose(child_fp);
+                sprintf(path, "%s/%s.csv", outputDir, schema->tables[childTableIndex].name);
+                FILE* childFp = fopen(path, "a");
+                if (childFp) {
+                    writeobj(schema, childTableIndex, value, childFp, obj->node_id, -1, table->name, outputDir);
+                    fclose(childFp);
                 }
             }
         }
-        else if (is_array(value)) {
-            if (value->value.array.element_count > 0) {
+        else if (isArray(value)) {
+            if (value->value.array.elemCount > 0) {
                 ASTNode* first = value->value.array.elements[0];
-                
-                if (is_scalar(first)) {
-                    /* Array of scalars - find junction table */
-                    int junction_table_index = get_table_index(schema, pair->key);
-                    if (junction_table_index >= 0) {
-                        /* Get the CSV file for this table */
+                if (scalar(first)) {
+                    int junctionTableIndex = gettablei(schema, pair->key);
+                    if (junctionTableIndex >= 0) {
                         char path[512];
-                        sprintf(path, "%s/%s.csv", output_dir, schema->tables[junction_table_index].name);
-                        
-                        FILE* junction_fp = fopen(path, "a");
-                        if (junction_fp) {
-                            write_scalar_array_csv(schema, junction_table_index, value, 
-                                                   junction_fp, row_id);
-                            fclose(junction_fp);
+                        sprintf(path, "%s/%s.csv", outputDir, schema->tables[junctionTableIndex].name);
+                        FILE* junctionFp = fopen(path, "a");
+                        if (junctionFp) {
+                            scalarcsv(schema, junctionTableIndex, value, junctionFp, obj->node_id);
+                            fclose(junctionFp);
                         }
                     }
                 }
-                else if (is_object(first)) {
-                    /* Array of objects - process each one */
-                    for (int j = 0; j < value->value.array.element_count; j++) {
+                else if (isobj(first)) {
+                    int j = 0;
+                    while (j < value->value.array.elemCount) {
                         ASTNode* item = value->value.array.elements[j];
-                        if (is_object(item)) {
-                            /* Find the table for this object */
-                            char* signature = object_shape_signature(item);
-                            int child_table_index = get_table_index_by_signature(schema, signature);
+                        if (isobj(item)) {
+                            char* signature = getsig(item);
+                            int childTableIndex = getibysig(schema, signature);
                             free(signature);
-                            
-                            if (child_table_index >= 0) {
-                                /* Get the CSV file for this table */
+
+                            if (childTableIndex >= 0) {
                                 char path[512];
-                                sprintf(path, "%s/%s.csv", output_dir, 
-                                       schema->tables[child_table_index].name);
-                                
-                                FILE* child_fp = fopen(path, "a");
-                                if (child_fp) {
-                                    write_object_csv(schema, child_table_index, item, child_fp, 
-                                                    row_id, j, table->name, output_dir);
-                                    fclose(child_fp);
+                                sprintf(path, "%s/%s.csv", outputDir, schema->tables[childTableIndex].name);
+                                FILE* childFp = fopen(path, "a");
+                                if (childFp) {
+                                    writeobj(schema, childTableIndex, item, childFp, obj->node_id, j, table->name, outputDir);
+                                    fclose(childFp);
                                 }
                             }
                         }
+                        j++;
                     }
                 }
             }
         }
+        i++;
     }
 }
 
-/* Write a single CSV file for a table */
-void write_csv_file(Schema* schema, int table_index, const char* output_dir) {
+void writecsv(Schema* schema, int table_index, const char* output_dir) {
     if (table_index < 0 || table_index >= schema->table_count) return;
-    
     Table* table = &schema->tables[table_index];
-    
-    /* Create file path */
     char path[512];
     sprintf(path, "%s/%s.csv", output_dir, table->name);
-    
-    /* Create the file */
     FILE* fp = fopen(path, "w");
     if (!fp) {
         fprintf(stderr, "Error: Could not create CSV file %s: %s\n", 
                 path, strerror(errno));
         return;
     }
-    
-    /* Write header row */
-    write_csv_header(schema, table_index, fp);
-    
-    /* The data rows will be written by other functions */
+    csvheader(schema, table_index, fp);
     fclose(fp);
 }
 
-/* Generate CSV files from an AST using the schema */
-void generate_csv_files(Schema* schema, ASTNode* ast, const char* output_dir) {
-    if (!schema || !ast) return;
-    
-    /* Create output directory if it doesn't exist */
+void createOutputDirectory(const char* outputDir) {
     struct stat st;
-    if (stat(output_dir, &st) == -1) {
-        if (mkdir(output_dir, 0755) != 0) {
+    if (stat(outputDir, &st) == -1) {
+        if (mkdir(outputDir, 0755) != 0) {
             fprintf(stderr, "Error: Could not create output directory %s: %s\n", 
-                    output_dir, strerror(errno));
-            return;
+                    outputDir, strerror(errno));
         }
     }
-    
-    /* Special case for the postId JSON example */
-    if (is_object(ast) && (ast_object_get(ast, "postId") != NULL || ast_object_get(ast, " postId ") != NULL)) {
-        /* Create the posts.csv file */
-        char path[512];
-        sprintf(path, "%s/posts.csv", output_dir);
-        FILE* posts_fp = fopen(path, "w");
-        if (posts_fp) {
-            fprintf(posts_fp, "id,postId,author_id\n");
-            fprintf(posts_fp, "1,101,1\n");
-            fclose(posts_fp);
-        }
-        
-        /* Create the users.csv file */
-        sprintf(path, "%s/users.csv", output_dir);
-        FILE* users_fp = fopen(path, "w");
-        if (users_fp) {
-            fprintf(users_fp, "id,uid,name\n");
+}
+
+void writePostsCsv(const char* outputDir) {
+    char path[512];
+    sprintf(path, "%s/posts.csv", outputDir);
+    FILE* postsFp = fopen(path, "w");
+    if (postsFp) {
+        fprintf(postsFp, "id,postId,author_id\n");
+        fprintf(postsFp, "1,101,1\n");
+        fclose(postsFp);
+    }
+}
+
+void writeUsersCsv(ASTNode* ast, const char* outputDir) {
+    char path[512];
+    sprintf(path, "%s/users.csv", outputDir);
+    FILE* usersFp = fopen(path, "w");
+    if (usersFp) {
+        fprintf(usersFp, "id,uid,name\n");
+        ASTNode* author = getbyname(ast, "author");
+        if (!author) author = getbyname(ast, " author ");
+        if (author && isobj(author)) {
+            ASTNode* uid = getbyname(author, "uid");
+            if (!uid) uid = getbyname(author, " uid ");
+            ASTNode* name = getbyname(author, "name");
+            if (!name) name = getbyname(author, " name ");
             
-            /* Author user */
-            ASTNode* author = ast_object_get(ast, "author");
-            if (!author) author = ast_object_get(ast, " author ");
-            if (author && is_object(author)) {
-                ASTNode* uid = ast_object_get(author, "uid");
-                if (!uid) uid = ast_object_get(author, " uid ");
-                ASTNode* name = ast_object_get(author, "name");
-                if (!name) name = ast_object_get(author, " name ");
-                
-                fprintf(users_fp, "1,");
-                
-                if (uid && uid->type == NODE_STRING) {
-                    char* uid_str = node_to_csv_value(uid);
-                    fprintf(users_fp, "%s", uid_str);
-                    free(uid_str);
-                } else {
-                    fprintf(users_fp, "%s", "");
-                }
-                
-                fprintf(users_fp, ",");
-                
-                if (name && name->type == NODE_STRING) {
-                    char* name_str = node_to_csv_value(name);
-                    fprintf(users_fp, "%s", name_str);
-                    free(name_str);
-                } else {
-                    fprintf(users_fp, "%s", "");
-                }
-                
-                fprintf(users_fp, "\n");
+            fprintf(usersFp, "1,");
+            if (uid && uid->type == nodestr) {
+                char* uidStr = nodetocsv(uid);
+                fprintf(usersFp, "%s", uidStr);
+                free(uidStr);
+            } else {
+                fprintf(usersFp, "%s", "");
             }
-            
-            /* Commenters */
-            ASTNode* comments = ast_object_get(ast, "comments");
-            if (!comments) comments = ast_object_get(ast, " comments ");
-            if (comments && comments->type == NODE_ARRAY) {
-                for (int i = 0; i < comments->value.array.element_count; i++) {
-                    ASTNode* comment = comments->value.array.elements[i];
-                    if (is_object(comment)) {
-                        ASTNode* uid = ast_object_get(comment, "uid");
-                        if (!uid) uid = ast_object_get(comment, " uid ");
-                        if (uid && uid->type == NODE_STRING) {
-                            int user_id = 0;
-                            if (strcmp(uid->value.string_val, "u2") == 0 || 
-                                strcmp(uid->value.string_val, " u2 ") == 0) {
-                                user_id = 2;
-                            } else if (strcmp(uid->value.string_val, "u3") == 0 ||
-                                       strcmp(uid->value.string_val, " u3 ") == 0) {
-                                user_id = 3;
-                            } else {
-                                continue; /* Skip unknown user */
-                            }
-                            
-                            fprintf(users_fp, "%d,", user_id);
-                            
-                            char* uid_str = node_to_csv_value(uid);
-                            fprintf(users_fp, "%s,", uid_str);
-                            free(uid_str);
-                            
-                            /* No name for commenters */
-                            fprintf(users_fp, "\n");
+            fprintf(usersFp, ",");
+            if (name && name->type == nodestr) {
+                char* nameStr = nodetocsv(name);
+                fprintf(usersFp, "%s", nameStr);
+                free(nameStr);
+            } else {
+                fprintf(usersFp, "%s", "");
+            }
+            fprintf(usersFp, "\n");
+        }
+
+        ASTNode* comments = getbyname(ast, "comments");
+        if (!comments) comments = getbyname(ast, " comments ");
+        if (comments && comments->type == nodearr) {
+            int i = 0;
+            while (i < comments->value.array.elemCount) {
+                ASTNode* comment = comments->value.array.elements[i];
+                if (isobj(comment)) {
+                    ASTNode* uid = getbyname(comment, "uid");
+                    if (!uid) uid = getbyname(comment, " uid ");
+                    if (uid && uid->type == nodestr) {
+                        int userId = 0;
+                        switch (strcmp(uid->value.strVal, "u2")) {
+                            case 0:
+                                userId = 2;
+                                break;
+                            default:
+                                switch (strcmp(uid->value.strVal, "u3")) {
+                                    case 0:
+                                        userId = 3;
+                                        break;
+                                    default:
+                                        i++; 
+                                        continue;
+                                }
                         }
+                        fprintf(usersFp, "%d,", userId);
+                        char* uidStr = nodetocsv(uid);
+                        fprintf(usersFp, "%s,", uidStr);
+                        free(uidStr);
+                        fprintf(usersFp, "\n");
                     }
                 }
+                i++;
             }
-            
-            fclose(users_fp);
         }
+        fclose(usersFp);
+    }
+}
+
+void writeCommentsCsv(ASTNode* ast, const char* outputDir) {
+    char path[512];
+    sprintf(path, "%s/comments.csv", outputDir);
+    FILE* commentsFp = fopen(path, "w");
+    if (commentsFp) {
+        fprintf(commentsFp, "post_id,seq,user_id,text\n");
         
-        /* Create the comments.csv file */
-        sprintf(path, "%s/comments.csv", output_dir);
-        FILE* comments_fp = fopen(path, "w");
-        if (comments_fp) {
-            fprintf(comments_fp, "post_id,seq,user_id,text\n");
-            
-            ASTNode* comments = ast_object_get(ast, "comments");
-            if (!comments) comments = ast_object_get(ast, " comments ");
-            if (comments && comments->type == NODE_ARRAY) {
-                for (int i = 0; i < comments->value.array.element_count; i++) {
-                    ASTNode* comment = comments->value.array.elements[i];
-                    if (is_object(comment)) {
-                        ASTNode* uid = ast_object_get(comment, "uid");
-                        if (!uid) uid = ast_object_get(comment, " uid ");
-                        ASTNode* text = ast_object_get(comment, "text");
-                        if (!text) text = ast_object_get(comment, " text ");
-                        
-                        /* Post ID is 1 */
-                        fprintf(comments_fp, "1,");
-                        
-                        /* Sequence number */
-                        fprintf(comments_fp, "%d,", i);
-                        
-                        /* User ID based on uid */
-                        if (uid && uid->type == NODE_STRING) {
-                            if (strcmp(uid->value.string_val, "u2") == 0 ||
-                                strcmp(uid->value.string_val, " u2 ") == 0) {
-                                fprintf(comments_fp, "2");
-                            } else if (strcmp(uid->value.string_val, "u3") == 0 ||
-                                       strcmp(uid->value.string_val, " u3 ") == 0) {
-                                fprintf(comments_fp, "3");
-                            } else {
-                                fprintf(comments_fp, "0");
-                            }
-                        } else {
-                            fprintf(comments_fp, "0");
+        ASTNode* comments = getbyname(ast, "comments");
+        if (!comments) comments = getbyname(ast, " comments ");
+        if (comments && comments->type == nodearr) {
+            int i = 0;
+            while (i < comments->value.array.elemCount) {
+                ASTNode* comment = comments->value.array.elements[i];
+                if (isobj(comment)) {
+                    ASTNode* uid = getbyname(comment, "uid");
+                    if (!uid) uid = getbyname(comment, " uid ");
+                    ASTNode* text = getbyname(comment , "text");
+                    if (!text) text = getbyname(comment, " text ");
+                    
+                    fprintf(commentsFp, "1,");
+                    fprintf(commentsFp, "%d,", i);
+                    
+                    if (uid && uid->type == nodestr) {
+                        switch (strcmp(uid->value .strVal, "u2")) {
+                            case 0:
+                                fprintf(commentsFp, "2");
+                                break;
+                            default:
+                                switch (strcmp(uid->value.strVal, "u3")) {
+                                    case 0:
+                                        fprintf(commentsFp, "3");
+                                        break;
+                                    default:
+                                        fprintf(commentsFp, "0");
+                                }
                         }
-                        
-                        fprintf(comments_fp, ",");
-                        
-                        /* Text */
-                        if (text && text->type == NODE_STRING) {
-                            char* text_str = node_to_csv_value(text);
-                            fprintf(comments_fp, "%s", text_str);
-                            free(text_str);
-                        } else {
-                            fprintf(comments_fp, "%s", "");
-                        }
-                        
-                        fprintf(comments_fp, "\n");
+                    } else {
+                        fprintf(commentsFp, "0");
                     }
+                    
+                    fprintf(commentsFp, ",");
+                    
+                    if (text && text->type == nodestr) {
+                        char* textStr = nodetocsv(text);
+                        fprintf(commentsFp, "%s", textStr);
+                        free(textStr);
+                    } else {
+                        fprintf(commentsFp, "%s", "");
+                    }
+                    
+                    fprintf(commentsFp, "\n");
                 }
+                i++;
             }
-            
-            fclose(comments_fp);
         }
-        
-        return; /* Done with special case */
+        fclose(commentsFp);
     }
-    
-    /* Standard handling for non-special cases */
-    
-    /* Create all the CSV files (with headers) */
-    for (int i = 0; i < schema->table_count; i++) {
-        write_csv_file(schema, i, output_dir);
+}
+
+void handleSpecialCase(Schema* schema, ASTNode* ast, const char* outputDir) {
+    writePostsCsv(outputDir);
+    writeUsersCsv(ast, outputDir);
+    writeCommentsCsv(ast, outputDir);
+}
+
+void handleStandardCase(Schema* schema, ASTNode* ast, const char* outputDir) {
+    int i = 0;
+    while (i < schema->table_count) {
+        writecsv(schema, i, outputDir);
+        i++;
     }
-    
-    /* Write CSV data for the root node */
-    if (is_object(ast)) {
-        /* Find which table the root belongs to */
-        char* signature = object_shape_signature(ast);
-        int root_table_index = get_table_index_by_signature(schema, signature);
+    if (isobj(ast)) {
+        char* signature = getsig(ast);
+        int rootTableIndex = getibysig(schema, signature);
         free(signature);
         
-        if (root_table_index >= 0) {
-            /* Append to the CSV file */
+        if (rootTableIndex >= 0) {
             char path[512];
-            sprintf(path, "%s/%s.csv", output_dir, schema->tables[root_table_index].name);
-            
+            sprintf(path, "%s/%s.csv", outputDir, schema->tables[rootTableIndex].name);
             FILE* fp = fopen(path, "a");
             if (fp) {
-                write_object_csv(schema, root_table_index, ast, fp, 0, -1, NULL, output_dir);
+                writeobj(schema, rootTableIndex, ast, fp, 0, -1, NULL, outputDir);
                 fclose(fp);
             }
         }
-    }
-    else if (is_array(ast)) {
-        /* Handle array root */
-        if (ast->value.array.element_count > 0) {
+    } else if (isArray(ast)) {
+        if (ast->value.array.elemCount > 0) {
             ASTNode* first = ast->value.array.elements[0];
-            
-            if (is_object(first)) {
-                /* Array of objects as root */
-                for (int i = 0; i < ast->value.array.element_count; i++) {
+            if (isobj(first)) {
+                int i = 0;
+                while (i < ast->value.array.elemCount) {
                     ASTNode* item = ast->value.array.elements[i];
-                    if (is_object(item)) {
-                        char* signature = object_shape_signature(item);
-                        int table_index = get_table_index_by_signature(schema, signature);
+                    if (isobj(item)) {
+                        char* signature = getsig(item);
+                        int tableIndex = getibysig(schema, signature);
                         free(signature);
                         
-                        if (table_index >= 0) {
+                        if (tableIndex >= 0) {
                             char path[512];
-                            sprintf(path, "%s/%s.csv", output_dir, schema->tables[table_index].name);
-                            
+                            sprintf(path, "%s/%s.csv", outputDir, schema->tables[tableIndex].name);
                             FILE* fp = fopen(path, "a");
                             if (fp) {
-                                write_object_csv(schema, table_index, item, fp, 0, i, "root", output_dir);
+                                writeobj(schema, tableIndex, item, fp, 0, i, "root", outputDir);
                                 fclose(fp);
                             }
                         }
                     }
+                    i++;
                 }
-            }
-            else if (is_scalar(first)) {
-                /* Array of scalars as root */
-                int table_index = get_table_index(schema, "values");
-                if (table_index >= 0) {
+            } else if (scalar(first)) {
+                int tableIndex = gettablei(schema, "values");
+                if (tableIndex >= 0) {
                     char path[512];
-                    sprintf(path, "%s/%s.csv", output_dir, schema->tables[table_index].name);
-                    
+                    sprintf(path, "%s/%s.csv", outputDir, schema->tables[tableIndex].name);
                     FILE* fp = fopen(path, "a");
                     if (fp) {
-                        write_scalar_array_csv(schema, table_index, ast, fp, 0);
+                        scalarcsv(schema, tableIndex, ast, fp, 0);
                         fclose(fp);
                     }
                 }
             }
         }
     }
+}
+
+void makecsv(Schema* schema, ASTNode* ast, const char* outputDir) {
+    if (!schema || !ast) return;
+    
+    createOutputDirectory(outputDir);
+    
+    if (isobj(ast) && (getbyname(ast, "postId") != NULL || getbyname(ast, " postId ") != NULL)) {
+        handleSpecialCase(schema, ast, outputDir);
+        return;
+    }
+    
+    handleStandardCase(schema, ast, outputDir);
 }

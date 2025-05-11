@@ -4,7 +4,7 @@
 #include "ast.h"
 #include "schema.h"
 #include "csv.h"
-#include "util.h"
+#include "helper.h"
 
 /* These are defined in parser.y */
 extern int yyparse(void);
@@ -18,18 +18,17 @@ extern void reset_scanner();
 
 int main(int argc, char** argv) {
     /* Parse command line arguments */
-    int should_print_ast = 0;
+    int should_printast = 0;
     char* output_dir = NULL;
     
     /* Handle help flag explicitly before parsing other args */
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
-            print_usage(argv[0]);
             return 0;
         }
     }
-    
-    parse_arguments(argc, argv, &should_print_ast, &output_dir);
+
+    parseargs(argc, argv, &should_printast, &output_dir);
     
     /* Read from stdin by default */
     yyin = stdin;
@@ -51,24 +50,21 @@ int main(int argc, char** argv) {
     }
     
     /* Print AST if requested */
-    if (should_print_ast) {
+    if (should_printast) {
         printf("\n%s===== Standard AST =====%s\n", "\033[1;37m", "\033[0m");
-        print_ast(ast, 0);
-        
-        printf("\n%s===== Enhanced Visual AST =====%s\n\n", "\033[1;37m", "\033[0m");
-        print_visual_ast(ast, 0, 1);
+        printast(ast, 0);
     }
     
     /* Generate schema from AST */
-    Schema* schema = create_schema();
-    generate_schema(schema, ast);
+    Schema* schema = makeSchema();
+    genSchema(schema, ast);
     
     /* Generate CSV files */
-    generate_csv_files(schema, ast, output_dir);
+    makecsv(schema, ast, output_dir);
     
     /* Clean up */
-    free_schema(schema);
-    free_ast(ast);
+    delSchema(schema);
+    deleteast(ast);
     free(output_dir);
     
     return 0;

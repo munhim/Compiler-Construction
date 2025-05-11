@@ -6,7 +6,7 @@ LDFLAGS = -lm
 # Source files
 FLEX_SRC = scanner.l
 BISON_SRC = parser.y
-C_SRC = ast.c schema.c csv.c util.c main.c
+C_SRC = ast.c schema.c csv.c helper.c main.c
 
 # Generated files
 FLEX_C = lex.yy.c

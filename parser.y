@@ -57,11 +57,11 @@ json:
     ;
 
 object:
-    '{' '}'         { $$ = create_object_node(NULL, 0); }
+    '{' '}'         { $$ = objnode(NULL, 0); }
     | '{' pairs '}' { 
         int count = 0;
         while ($2[count] != NULL) count++;
-        $$ = create_object_node($2, count);
+        $$ = objnode($2, count);
     }
     ;
 
@@ -90,17 +90,17 @@ pairs:
 
 pair:
     STRING ':' value { 
-        $$ = create_key_value_pair($1, $3);
-        free($1); /* Free the string as it's copied in create_key_value_pair */
+        $$ = createKVpair($1, $3);
+        free($1); /* Free the string as it's copied in createKVpair */
     }
     ;
 
 array:
-    '[' ']'         { $$ = create_array_node(NULL, 0); }
+    '[' ']'         { $$ = arrnode(NULL, 0); }
     | '[' values ']' { 
         int count = 0;
         while ($2[count] != NULL) count++;
-        $$ = create_array_node($2, count);
+        $$ = arrnode($2, count);
     }
     ;
 
@@ -130,11 +130,11 @@ values:
 value:
     object          { $$ = $1; }
     | array         { $$ = $1; }
-    | STRING        { $$ = create_string_node($1); free($1); }
-    | INTEGER       { $$ = create_integer_node($1); }
-    | NUMBER        { $$ = create_number_node($1); }
-    | BOOLEAN       { $$ = create_boolean_node($1); }
-    | NULLVAL       { $$ = create_null_node(); }
+    | STRING        { $$ = strnode($1); free($1); }
+    | INTEGER       { $$ = intnode($1); }
+    | NUMBER        { $$ = numnode($1); }
+    | BOOLEAN       { $$ = boolnode($1); }
+    | NULLVAL       { $$ = nullnode(); }
     ;
 
 %%

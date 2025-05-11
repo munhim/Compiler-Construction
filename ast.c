@@ -3,157 +3,200 @@
 #include <string.h>
 #include "ast.h"
 
-/* Global counter for node IDs */
-static long next_node_id = 1;
+static long nextnodeID = 1;
 
-/* Get the next unique ID */
-long get_next_id() {
-    return next_node_id++;
+long getnid() {
+    return nextnodeID++;
+}
+void resetNid() {
+    nextnodeID = 1;
 }
 
-/* Reset the node ID counter (for testing) */
-void reset_node_ids() {
-    next_node_id = 1;
-}
-
-/* AST node creation functions */
-ASTNode* create_object_node(KeyValuePair** pairs, int count) {
+ASTNode* objnode(KeyValuePair** pairs, int count) {
     ASTNode* node = calloc(1, sizeof(ASTNode));
     if (!node) return NULL;
-    
-    node->type = NODE_OBJECT;
+    node->type = nodeobj; 
     node->value.object.pairs = pairs;
-    node->value.object.pair_count = count;
+    node->value.object.pairCount = count;
     node->parent = NULL;
-    node->node_id = get_next_id();
-    
-    /* Set parent pointers for all children */
-    for (int i = 0; i < count; i++) {
-        if (pairs && pairs[i] && pairs[i]->value) {
-            pairs[i]->value->parent = node;
-        }
+    node->node_id = getnid();
+    switch (pairs != NULL) {
+        case 1: 
+            int i = 0;
+            while (i < count) {
+                switch (pairs[i] != NULL && pairs[i]->value != NULL) {
+                    case 1: 
+                        pairs[i]->value->parent = node; 
+                        break;
+                    default:
+                        break;
+                }
+                i++;
+            }
+            break;
+        default:
+            break;
     }
-    
     return node;
 }
 
-ASTNode* create_array_node(ASTNode** elements, int count) {
+ASTNode* arrnode(ASTNode** elements, int count) {
     ASTNode* node = calloc(1, sizeof(ASTNode));
-    if (!node) return NULL;
-    
-    node->type = NODE_ARRAY;
+    switch (node != NULL) {
+        case 0:
+            return NULL;
+        default:
+            break;
+    }
+    node->type = nodearr;
     node->value.array.elements = elements;
-    node->value.array.element_count = count;
+    node->value.array.elemCount = count;
     node->parent = NULL;
-    node->node_id = get_next_id();
-    
-    /* Set parent pointers for all elements */
-    for (int i = 0; i < count; i++) {
-        if (elements && elements[i]) {
-            elements[i]->parent = node;
+    node->node_id = getnid();
+    switch (elements != NULL) {
+        case 1: {
+            int i = 0;
+            while (i < count) {
+                switch (elements[i] != NULL) {
+                    case 1:
+                        elements[i]->parent = node;
+                        break;
+                    default:
+                        break;
+                }
+                i++;
+            }
+            break;
         }
+        default:
+            break;
     }
-    
     return node;
 }
 
-ASTNode* create_string_node(char* value) {
+ASTNode* strnode(char* value) {
     ASTNode* node = calloc(1, sizeof(ASTNode));
-    if (!node) return NULL;
-    
-    node->type = NODE_STRING;
-    node->value.string_val = strdup(value);
+    switch (node != NULL) {
+        case 0:
+            return NULL;
+        default:
+            break;
+    }
+    node->type = nodestr;
+    node->value.strVal = strdup(value);
     node->parent = NULL;
-    node->node_id = get_next_id();
-    
+    node->node_id = getnid();
     return node;
 }
 
-ASTNode* create_integer_node(long value) {
+
+ASTNode* intnode(long value) {
     ASTNode* node = calloc(1, sizeof(ASTNode));
-    if (!node) return NULL;
-    
-    node->type = NODE_INTEGER;
-    node->value.int_val = value;
+    switch (node != NULL) {
+        case 0:
+            return NULL;
+        default:
+            break;
+    }
+    node->type = nodeint;
+    node->value.intVal = value;
     node->parent = NULL;
-    node->node_id = get_next_id();
-    
+    node->node_id = getnid();
     return node;
 }
 
-ASTNode* create_number_node(double value) {
+ASTNode* numnode(double value) {
     ASTNode* node = calloc(1, sizeof(ASTNode));
-    if (!node) return NULL;
-    
-    node->type = NODE_NUMBER;
-    node->value.num_val = value;
+    switch (node != NULL) {
+        case 0:
+            return NULL;
+        default:
+            break;
+    }
+    node->type = nodenum;
+    node->value.numVal = value;
     node->parent = NULL;
-    node->node_id = get_next_id();
-    
+    node->node_id = getnid();
     return node;
 }
 
-ASTNode* create_boolean_node(int value) {
+
+ASTNode* boolnode(int value) {
     ASTNode* node = calloc(1, sizeof(ASTNode));
-    if (!node) return NULL;
-    
-    node->type = NODE_BOOLEAN;
-    node->value.bool_val = value;
+    switch (node != NULL) {
+        case 0:
+            return NULL;
+        default:
+            break;
+    }
+    node->type = nodebool;
+    node->value.boolVal = value;
     node->parent = NULL;
-    node->node_id = get_next_id();
-    
+    node->node_id = getnid();
     return node;
 }
 
-ASTNode* create_null_node() {
+
+ASTNode* nullnode() {
     ASTNode* node = calloc(1, sizeof(ASTNode));
-    if (!node) return NULL;
-    
-    node->type = NODE_NULL;
+    switch (node != NULL) {
+        case 0:
+            return NULL;
+        default:
+            break;
+    }
+    node->type = nodenull;
     node->parent = NULL;
-    node->node_id = get_next_id();
-    
+    node->node_id = getnid();
     return node;
 }
 
-KeyValuePair* create_key_value_pair(char* key, ASTNode* value) {
+KeyValuePair* createKVpair(char* key, ASTNode* value) {
     KeyValuePair* pair = calloc(1, sizeof(KeyValuePair));
-    if (!pair) return NULL;
-    
+    switch (pair != NULL) {
+        case 0:
+            return NULL;
+        default:
+            break;
+    }
     pair->key = strdup(key);
     pair->value = value;
-    
     return pair;
 }
 
-/* Get a value from an object by key name */
-ASTNode* ast_object_get(ASTNode* obj, const char* key) {
-    if (!obj || obj->type != NODE_OBJECT) return NULL;
-    
-    for (int i = 0; i < obj->value.object.pair_count; i++) {
+ASTNode* getbyname(ASTNode* obj, const char* key) {
+    switch (obj && obj->type == nodeobj) {
+        case 0:
+            return NULL;
+        default:
+            break;
+    }
+    int i = 0;
+    while (i < obj->value.object.pairCount) {
         if (strcmp(obj->value.object.pairs[i]->key, key) == 0) {
             return obj->value.object.pairs[i]->value;
         }
+        i++;
     }
-    
     return NULL;
 }
 
-/* Helper to add a key to a string buffer, with dynamic resizing */
-void append_to_signature(char** sig, size_t* size, size_t* pos, const char* key) {
+
+void apptosig(char** sig, size_t* size, size_t* pos, const char* key) {
     size_t key_len = strlen(key);
-    
-    /* Check if we need to resize */
-    while (*pos + key_len + 2 >= *size) {  /* +2 for delimiter and safety */
+    int need_resize = (*pos + key_len + 2 >= *size);
+    while (need_resize) {
         *size *= 2;
         *sig = realloc(*sig, *size);
-        if (!*sig) {
-            fprintf(stderr, "Memory allocation failed\n");
-            exit(1);
+
+        switch (*sig != NULL) {
+            case 0:
+                fprintf(stderr, "Memory allocation failed\n");
+                exit(1);
         }
+
+        need_resize = (*pos + key_len + 2 >= *size);
     }
-    
-    /* Add the key and a delimiter */
     strcpy(*sig + *pos, key);
     *pos += key_len;
     (*sig)[*pos] = ',';
@@ -161,100 +204,107 @@ void append_to_signature(char** sig, size_t* size, size_t* pos, const char* key)
     (*sig)[*pos] = '\0';
 }
 
-/* Generate a signature that uniquely identifies object shapes with the same structure */
-char* object_shape_signature(ASTNode* obj) {
-    if (!obj || obj->type != NODE_OBJECT) return NULL;
-
-    size_t size = 256;  /* Initial buffer size */
+char* getsig(ASTNode* obj) {
+    switch (obj && obj->type == nodeobj) {
+        case 0:
+            return NULL;
+    }
+    size_t size = 256; 
     size_t pos = 0;
     char* sig = malloc(size);
     if (!sig) return NULL;
     sig[0] = '\0';
-    
-    /* Sort keys alphabetically for consistent signatures */
-    char** keys = malloc(obj->value.object.pair_count * sizeof(char*));
+    int count = obj->value.object.pairCount;
+    char** keys = malloc(count * sizeof(char*));
     if (!keys) {
         free(sig);
         return NULL;
     }
-    
-    /* Copy keys */
-    for (int i = 0; i < obj->value.object.pair_count; i++) {
+    int i = 0;
+    while (i < count) {
         keys[i] = obj->value.object.pairs[i]->key;
+        i++;
     }
-    
-    /* Simple bubble sort for keys (OK for small objects) */
-    for (int i = 0; i < obj->value.object.pair_count - 1; i++) {
-        for (int j = 0; j < obj->value.object.pair_count - i - 1; j++) {
+    i = 0;
+    while (i < count - 1) {
+        int j = 0;
+        while (j < count - i - 1) {
             if (strcmp(keys[j], keys[j+1]) > 0) {
                 char* temp = keys[j];
                 keys[j] = keys[j+1];
                 keys[j+1] = temp;
             }
+            j++;
         }
+        i++;
     }
-    
-    /* Build signature with sorted keys */
-    for (int i = 0; i < obj->value.object.pair_count; i++) {
-        append_to_signature(&sig, &size, &pos, keys[i]);
-        
-        /* Find the value for this key */
+    i = 0;
+    while (i < count) {
+        apptosig(&sig, &size, &pos, keys[i]);
         ASTNode* value = NULL;
-        for (int j = 0; j < obj->value.object.pair_count; j++) {
+        int j = 0;
+        while (j < count) {
             if (strcmp(obj->value.object.pairs[j]->key, keys[i]) == 0) {
                 value = obj->value.object.pairs[j]->value;
                 break;
             }
+            j++;
         }
-        
-        /* Add type information to signature */
         if (value) {
-            if (value->type == NODE_OBJECT) {
-                append_to_signature(&sig, &size, &pos, "{}");
-            } else if (value->type == NODE_ARRAY) {
-                append_to_signature(&sig, &size, &pos, "[]");
-                
-                /* If array has elements, check first one's type */
-                if (value->value.array.element_count > 0) {
-                    ASTNode* first = value->value.array.elements[0];
-                    if (first->type == NODE_OBJECT) {
-                        /* Include object shape in array elements */
-                        char* inner_sig = object_shape_signature(first);
-                        if (inner_sig) {
-                            append_to_signature(&sig, &size, &pos, inner_sig);
-                            free(inner_sig);
+            switch (value->type) {
+                case nodeobj:
+                    apptosig(&sig, &size, &pos, "{}");
+                    break;
+                case nodearr:
+                    apptosig(&sig, &size, &pos, "[]");
+                    if (value->value.array.elemCount > 0) {
+                        ASTNode* first = value->value.array.elements[0];
+                        switch (first->type) {
+                            case nodeobj: {
+                                char* inner_sig = getsig(first);
+                                if (inner_sig) {
+                                    apptosig(&sig, &size, &pos, inner_sig);
+                                    free(inner_sig);
+                                }
+                                break;
+                            }
+                            default:
+                                break;
                         }
                     }
-                }
-            } else {
-                /* Add scalar type to signature */
-                switch(value->type) {
-                    case NODE_STRING: append_to_signature(&sig, &size, &pos, "s"); break;
-                    case NODE_INTEGER: append_to_signature(&sig, &size, &pos, "i"); break;
-                    case NODE_NUMBER: append_to_signature(&sig, &size, &pos, "n"); break;
-                    case NODE_BOOLEAN: append_to_signature(&sig, &size, &pos, "b"); break;
-                    case NODE_NULL: append_to_signature(&sig, &size, &pos, "0"); break;
-                    default: break;
-                }
+                    break;
+                case nodestr:
+                    apptosig(&sig, &size, &pos, "s");
+                    break;
+                case nodeint:
+                    apptosig(&sig, &size, &pos, "i");
+                    break;
+                case nodenum:
+                    apptosig(&sig, &size, &pos, "n");
+                    break;
+                case nodebool:
+                    apptosig(&sig, &size, &pos, "b");
+                    break;
+                case nodenull:
+                    apptosig(&sig, &size, &pos, "0");
+                    break;
+                default:
+                    break;
             }
         }
+        i++;
     }
-    
     free(keys);
-    
-    /* Remove trailing comma if it exists */
-    if (pos > 0 && sig[pos-1] == ',') {
-        sig[pos-1] = '\0';
+    if (pos > 0 && sig[pos - 1] == ',') {
+        sig[pos - 1] = '\0';
     }
-    
     return sig;
 }
 
-/* Check if an object matches a given signature */
-int object_matches_signature(ASTNode* obj, const char* signature) {
-    if (!obj || obj->type != NODE_OBJECT || !signature) return 0;
+int matches(ASTNode* obj, const char* signature) {
+    if (!obj || obj->type != nodeobj || !signature) return 0;
     
-    char* obj_sig = object_shape_signature(obj);
+    char* obj_sig = getsig(obj);
     if (!obj_sig) return 0;
     
     int result = (strcmp(obj_sig, signature) == 0);
@@ -263,49 +313,34 @@ int object_matches_signature(ASTNode* obj, const char* signature) {
     return result;
 }
 
-/* Get unique ID for a node */
-long get_node_id(ASTNode* node) {
+long getnodeID(ASTNode* node) {
     return node ? node->node_id : 0;
 }
 
-/* Helper functions to check node types */
-int is_object(ASTNode* node) {
-    return node && node->type == NODE_OBJECT;
+int isobj(ASTNode* node) {
+    return node && node->type == nodeobj;
 }
 
-int is_array(ASTNode* node) {
-    return node && node->type == NODE_ARRAY;
+int isArray(ASTNode* node) {
+    return node && node->type == nodearr;
 }
 
-int is_scalar(ASTNode* node) {
+int scalar(ASTNode* node) {
     if (!node) return 0;
-    return node->type != NODE_OBJECT && node->type != NODE_ARRAY;
+    return node->type != nodeobj && node->type != nodearr;
 }
 
-/* ANSI color codes for colorful output */
-#define COLOR_RESET   "\033[0m"
-#define COLOR_RED     "\033[31m"
-#define COLOR_GREEN   "\033[32m"
-#define COLOR_YELLOW  "\033[33m"
-#define COLOR_BLUE    "\033[34m"
-#define COLOR_MAGENTA "\033[35m"
-#define COLOR_CYAN    "\033[36m"
-#define COLOR_WHITE   "\033[37m"
-#define COLOR_BOLD    "\033[1m"
-
-/* Print a node with proper indentation and tree-like structure */
-void print_ast_node(ASTNode* node, int indent, char* prefix) {
+void printnodeast(ASTNode* node, int indent, char* prefix) {
     if (!node) return;
-    
-    /* Create indentation string */
     char indent_str[256] = {0};
     char tree_prefix[256] = {0};
-    
-    if (prefix) {
-        strcpy(tree_prefix, prefix);
+    switch(prefix != NULL) {
+        case 1:
+            strcpy(tree_prefix, prefix);
+            break;
+        case 0:
+            break;
     }
-    
-    /* Create the tree-like structure prefix */
     for (int i = 0; i < indent; i++) {
         if (i == indent - 1) {
             strcat(tree_prefix, "└── ");
@@ -313,248 +348,149 @@ void print_ast_node(ASTNode* node, int indent, char* prefix) {
             strcat(tree_prefix, "    ");
         }
     }
-    
-    /* Plain indentation for child items */
     for (int i = 0; i < indent * 4; i++) {
         indent_str[i] = ' ';
     }
-    
     switch(node->type) {
-        case NODE_OBJECT:
-            printf("%s%s%sObject%s (id=%ld) {\n", 
-                  tree_prefix, COLOR_BOLD, COLOR_BLUE, COLOR_RESET, node->node_id);
+        case nodeobj:
+            printf("%sObject (id=%ld) {\n", tree_prefix, node->node_id);
             
-            for (int i = 0; i < node->value.object.pair_count; i++) {
+            int i = 0;
+            while (i < node->value.object.pairCount) {
                 KeyValuePair* pair = node->value.object.pairs[i];
-                
-                /* Prepare the child prefix */
                 char child_prefix[256] = {0};
                 strcpy(child_prefix, indent_str);
-                
-                /* Add connector based on whether it's the last item */
-                if (i == node->value.object.pair_count - 1) {
-                    strcat(child_prefix, "└── ");
-                } else {
-                    strcat(child_prefix, "├── ");
+                switch(i == node->value.object.pairCount - 1) {
+                    case 1:
+                        strcat(child_prefix, "└── ");
+                        break;
+                    default:
+                        strcat(child_prefix, "├── ");
+                        break;
                 }
-                
-                /* Print key with color */
-                printf("%s%s\"%s\"%s: ", 
-                      child_prefix, COLOR_GREEN, pair->key, COLOR_RESET);
-                
-                /* For scalar values, print inline */
-                if (is_scalar(pair->value)) {
-                    print_ast_node(pair->value, 0, NULL);
+                printf("%s\"%s\": ", child_prefix, pair->key);
+                if (scalar(pair->value)) {
+                    printnodeast(pair->value, 0, NULL);
                     printf("\n");
                 } else {
-                    /* For objects and arrays, print as tree */
                     printf("\n");
-                    
-                    /* Prepare nested prefix */
                     char nested_prefix[256] = {0};
                     strcpy(nested_prefix, indent_str);
-                    
-                    if (i == node->value.object.pair_count - 1) {
-                        strcat(nested_prefix, "    ");
-                    } else {
-                        strcat(nested_prefix, "│   ");
+                    switch(i == node->value.object.pairCount - 1) {
+                        case 1:
+                            strcat(nested_prefix, "    ");
+                            break;
+                        default:
+                            strcat(nested_prefix, "│   ");
+                            break;
                     }
-                    
-                    print_ast_node(pair->value, 1, nested_prefix);
+                    printnodeast(pair->value, 1, nested_prefix);
                 }
+                i++;
             }
-            
-            /* Print closing brace with tree-like structure */
             if (indent > 0) {
-                printf("%s%s}%s\n", indent_str, COLOR_BLUE, COLOR_RESET);
+                printf("%s}\n", indent_str);
             } else if (prefix) {
-                printf("%s%s}%s\n", prefix, COLOR_BLUE, COLOR_RESET);
+                printf("%s}\n", prefix);
             } else {
-                printf("%s}%s\n", COLOR_BLUE, COLOR_RESET);
+                printf("}\n");
             }
             break;
-            
-        case NODE_ARRAY:
-            printf("%s%s%sArray%s (id=%ld) [\n", 
-                  tree_prefix, COLOR_BOLD, COLOR_MAGENTA, COLOR_RESET, node->node_id);
-            
-            for (int i = 0; i < node->value.array.element_count; i++) {
-                /* Prepare the child prefix */
+        case nodearr:
+            printf("%sArray (id=%ld) [\n", tree_prefix, node->node_id);
+            int j = 0;
+            while (j < node->value.array.elemCount) {
                 char child_prefix[256] = {0};
                 strcpy(child_prefix, indent_str);
-                
-                /* Mark array elements with index numbers */
-                if (i == node->value.array.element_count - 1) {
-                    printf("%s└── %s[%d]:%s ", indent_str, COLOR_YELLOW, i, COLOR_RESET);
-                    strcat(child_prefix, "    ");
-                } else {
-                    printf("%s├── %s[%d]:%s ", indent_str, COLOR_YELLOW, i, COLOR_RESET);
-                    strcat(child_prefix, "│   ");
+                switch(j == node->value.array.elemCount - 1) {
+                    case 1:
+                        printf("%s└── [%d]: ", indent_str, j);
+                        strcat(child_prefix, "    ");
+                        break;
+                    default:
+                        printf("%s├── [%d]: ", indent_str, j);
+                        strcat(child_prefix, "│   ");
+                        break;
                 }
-                
-                /* For scalar values, print inline */
-                if (is_scalar(node->value.array.elements[i])) {
-                    print_ast_node(node->value.array.elements[i], 0, NULL);
+                if (scalar(node->value.array.elements[j])) {
+                    printnodeast(node->value.array.elements[j], 0, NULL);
                     printf("\n");
                 } else {
-                    /* For objects and arrays, print as tree */
                     printf("\n");
-                    print_ast_node(node->value.array.elements[i], 1, child_prefix);
+                    printnodeast(node->value.array.elements[j], 1, child_prefix);
                 }
-            }
-            
-            /* Print closing bracket with tree-like structure */
+                j++;
+            } 
             if (indent > 0) {
-                printf("%s%s]%s\n", indent_str, COLOR_MAGENTA, COLOR_RESET);
+                printf("%s]\n", indent_str);
             } else if (prefix) {
-                printf("%s%s]%s\n", prefix, COLOR_MAGENTA, COLOR_RESET);
+                printf("%s]\n", prefix);
             } else {
-                printf("%s]%s\n", COLOR_MAGENTA, COLOR_RESET);
+                printf("]\n");
             }
             break;
-            
-        case NODE_STRING:
-            printf("%s%s\"%s\"%s", 
-                  tree_prefix, COLOR_GREEN, node->value.string_val, COLOR_RESET);
+        case nodestr:
+            printf("%s\"%s\"", tree_prefix, node->value.strVal);
             break;
-            
-        case NODE_INTEGER:
-            printf("%s%s%ld%s", 
-                  tree_prefix, COLOR_CYAN, node->value.int_val, COLOR_RESET);
+        case nodeint:
+            printf("%s%ld", tree_prefix, node->value.intVal);
             break;
-            
-        case NODE_NUMBER:
-            printf("%s%s%f%s", 
-                  tree_prefix, COLOR_CYAN, node->value.num_val, COLOR_RESET);
+        case nodenum:
+            printf("%s%f", tree_prefix, node->value.numVal);
             break;
-            
-        case NODE_BOOLEAN:
-            printf("%s%s%s%s", 
-                  tree_prefix, COLOR_YELLOW, 
-                  node->value.bool_val ? "true" : "false", COLOR_RESET);
+        case nodebool:
+            printf("%s%s", tree_prefix, node->value.boolVal ? "true" : "false");
             break;
-            
-        case NODE_NULL:
-            printf("%s%snull%s", 
-                  tree_prefix, COLOR_RED, COLOR_RESET);
+        case nodenull:
+            printf("%snull", tree_prefix);
             break;
     }
 }
 
-/* Print the AST with indentation and tree structure */
-void print_ast(ASTNode* node, int indent) {
-    printf("\n%s%s===== AST Tree View =====%s\n\n", COLOR_BOLD, COLOR_WHITE, COLOR_RESET);
-    print_ast_node(node, indent, NULL);
+void printast(ASTNode* node, int indent) {
+    printf("\n===== AST Tree View =====\n");
+    printnodeast(node, indent, NULL);
 }
 
-/* Print a visual tree representation of the AST with unicode box drawing */
-void print_visual_ast(ASTNode* node, int indent, int is_last) {
-    if (!node) return;
-    
-    /* Print indentation and branch characters */
-    for (int i = 0; i < indent - 1; i++) {
-        printf("%s", "│   ");
-    }
-    
-    if (indent > 0) {
-        printf("%s", is_last ? "└── " : "├── ");
-    }
-    
-    /* Print node according to its type with color */
+void deleteast(ASTNode* node) {
+    if (!node) return; 
     switch(node->type) {
-        case NODE_OBJECT:
-            printf("\033[1;33mOBJECT\033[0m (%d pairs)\n", node->value.object.pair_count);
-            for (int i = 0; i < node->value.object.pair_count; i++) {
-                KeyValuePair* pair = node->value.object.pairs[i];
-                
-                /* Print the key as a branch */
-                for (int j = 0; j < indent; j++) {
-                    printf("%s", "│   ");
-                }
-                printf("%s", "├── ");
-                printf("\033[1;36mKey: \"%s\"\033[0m\n", pair->key);
-                
-                /* Print the value */
-                print_visual_ast(pair->value, indent + 1, 
-                              i == node->value.object.pair_count - 1 && 
-                              pair->value->type != NODE_OBJECT && 
-                              pair->value->type != NODE_ARRAY);
-            }
-            break;
-            
-        case NODE_ARRAY:
-            printf("\033[1;35mARRAY\033[0m (%d elements)\n", node->value.array.element_count);
-            for (int i = 0; i < node->value.array.element_count; i++) {
-                print_visual_ast(node->value.array.elements[i], indent + 1, 
-                              i == node->value.array.element_count - 1);
-            }
-            break;
-            
-        case NODE_STRING:
-            printf("\033[1;32mSTRING:\033[0m \"%s\"\n", node->value.string_val);
-            break;
-            
-        case NODE_NUMBER:
-            printf("\033[1;34mNUMBER:\033[0m %f\n", node->value.num_val);
-            break;
-            
-        case NODE_INTEGER:
-            printf("\033[1;34mINTEGER:\033[0m %ld\n", node->value.int_val);
-            break;
-            
-        case NODE_BOOLEAN:
-            printf("\033[1;31mBOOLEAN:\033[0m %s\n", 
-                  node->value.bool_val ? "true" : "false");
-            break;
-            
-        case NODE_NULL:
-            printf("\033[1;37mNULL\033[0m\n");
-            break;
-            
-        default:
-            printf("UNKNOWN NODE TYPE\n");
-    }
-}
-
-/* Free memory for an AST node and all its children */
-void free_ast(ASTNode* node) {
-    if (!node) return;
-    
-    switch(node->type) {
-        case NODE_OBJECT:
+        case nodeobj:
             if (node->value.object.pairs) {
-                for (int i = 0; i < node->value.object.pair_count; i++) {
+                int i = 0;
+                while (i < node->value.object.pairCount) {
                     if (node->value.object.pairs[i]) {
                         if (node->value.object.pairs[i]->key) {
                             free(node->value.object.pairs[i]->key);
                         }
-                        free_ast(node->value.object.pairs[i]->value);
+                        deleteast(node->value.object.pairs[i]->value);
                         free(node->value.object.pairs[i]);
                     }
+                    i++;
                 }
                 free(node->value.object.pairs);
             }
-            break;
-            
-        case NODE_ARRAY:
+            break;    
+        case nodearr:
             if (node->value.array.elements) {
-                for (int i = 0; i < node->value.array.element_count; i++) {
-                    free_ast(node->value.array.elements[i]);
+                int i = 0;
+                while (i < node->value.array.elemCount) {
+                    deleteast(node->value.array.elements[i]);
+                    i++;
                 }
                 free(node->value.array.elements);
             }
             break;
             
-        case NODE_STRING:
-            if (node->value.string_val) {
-                free(node->value.string_val);
+        case nodestr:
+            if (node->value.strVal) {
+                free(node->value.strVal);
             }
             break;
             
         default:
-            /* Other node types don't have allocated memory */
             break;
-    }
-    
+    } 
     free(node);
 }
+

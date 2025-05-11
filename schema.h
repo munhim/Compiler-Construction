@@ -43,38 +43,17 @@ typedef struct {
     int table_count;            /* Number of tables */
 } Schema;
 
-/* Schema functions */
-Schema* create_schema();
-void free_schema(Schema* schema);
+Schema* makeSchema();
+void delSchema(Schema* schema);
+void genSchema(Schema* schema, ASTNode* ast);
+int addT(Schema* schema, const char* name, int is_junction, int is_child);
+void addC(Schema* schema, int table_index, const char* name, ColumnType type, const char* references);
+int exists(Schema* schema, const char* name);
+int colexist(Schema* schema, int table_index, const char* name);
+int tableexists(Schema* schema, const char* signature);
+int gettablei(Schema* schema, const char* name);
+int getibysig(Schema* schema, const char* signature);
+void printschema(Schema* schema);
+void processobj(Schema* schema, ASTNode* obj, const char* parent_table, long parent_id, int array_index);
 
-/* Generate a schema from an AST */
-void generate_schema(Schema* schema, ASTNode* ast);
-
-/* Add a table to the schema */
-int add_table(Schema* schema, const char* name, int is_junction, int is_child);
-
-/* Add a column to a table */
-void add_column(Schema* schema, int table_index, const char* name, ColumnType type, const char* references);
-
-/* Check if a table with the given name already exists */
-int table_exists(Schema* schema, const char* name);
-
-/* Check if a column exists in a table */
-int column_exists(Schema* schema, int table_index, const char* name);
-
-/* Check if a table with the given signature already exists */
-int table_with_signature_exists(Schema* schema, const char* signature);
-
-/* Get the index of a table by name */
-int get_table_index(Schema* schema, const char* name);
-
-/* Get the index of a table by signature */
-int get_table_index_by_signature(Schema* schema, const char* signature);
-
-/* Print the schema */
-void print_schema(Schema* schema);
-
-/* Process an object node and add it to the appropriate table */
-void process_object(Schema* schema, ASTNode* obj, const char* parent_table, long parent_id, int array_index);
-
-#endif /* SCHEMA_H */
+#endif 
