@@ -64,15 +64,14 @@ This C-based project converts JSON structures into a normalized relational datab
 ### Step 1: Compile
 
 ```bash
-flex lexer.l
-bison -d parser.y
-gcc -o schema_converter *.c -lfl
+make clean
+make
 ```
 
 ### Step 2: Run
 
 ```bash
-./schema_converter < input.json
+./json2relcsv < tests/test5.json --print-ast --out-dir output
 ```
 
 The schema is printed to standard output. Redirect to a file if needed.
